@@ -91,3 +91,7 @@ l’enrôlement GLF et le chargement des modules sous Secure Boot.
 La CI ne crée pas de nouvelle clé GLF. La clé existante reste hors du dépôt et du
 store Nix. Le stockage GitHub Secrets est une première solution ; une clé non
 exportable nécessitera un service de signature ou HSM contrôlé par GLF.
+
+La clé GLF devra désormais être créée dans un service/HSM et rester **non
+exportable**. La signature est désactivée sur GitHub en attendant cette
+intégration ; le script PEM existant n’est pas la solution de production retenue.

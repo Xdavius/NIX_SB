@@ -37,7 +37,30 @@ Le système complet référencé par l’UKI doit exister dans le store de la ma
 cible. Télécharger uniquement l’UKI et le noyau ne constitue pas une installation
 NixOS. Le déploiement du système, du shim Rocky et de MokManager reste à réaliser.
 
-## Activer la signature GLF
+## Exigence actuelle : clé non exportable
+
+La clé GLF n’existe pas encore. Elle doit être neuve, persistante et générée une
+seule fois dans un service de signature/HSM qui ne permet pas d’exporter sa partie
+privée, y compris par l’administrateur du dépôt. GitHub Secrets ne satisfait pas
+cette exigence : un administrateur peut modifier un workflow qui reçoit un secret.
+
+La signature reste donc désactivée (`GLF_SIGNING_ENABLED=false`). Aucun secret de
+signature n’a été créé. Le code actuel `ci/sign.sh` est un prototype de signature
+par fichier PEM, testé avec une clé jetable ; il doit être remplacé par un appel
+au service de signature avant l’activation. Le service, son compte et ses droits
+restent à définir. Le certificat public pourra ensuite être publié et enrôlé.
+
+Le dépôt GitHub et le workflow sont publiés. L’environnement `glf-signing` est
+restreint à `main` et demande une validation de `Xdavius`. Cette validation peut
+être donnée par le déclencheur lui-même ; elle ne constitue pas une revue par une
+seconde personne. Les protections de branche imposent séparément une revue de PR.
+
+### Ancien parcours PEM — non retenu pour la clé GLF
+
+La procédure suivante décrit le prototype existant. **Ne pas l’activer pour la
+clé GLF**, car elle ne respecte pas l’exigence de clé non exportable.
+
+### Configuration du prototype PEM
 
 Configurer dans les paramètres GitHub, avant le premier lancement signé :
 

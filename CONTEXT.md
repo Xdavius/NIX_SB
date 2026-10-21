@@ -51,6 +51,15 @@ contrôlé par GLF, ou une construction centrale par configuration machine. La c
 privée GLF ne doit pas être distribuée aux postes. Ce raccordement à `glf-update`
 reste à implémenter ; voir [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md).
 
+## Nouvelle exigence pour la clé GLF
+
+La clé de production n’existe pas encore. Elle doit être créée une seule fois,
+puis rester non exportable, y compris pour l’administrateur GitHub. Le stockage
+dans GitHub Secrets n’est donc plus la solution retenue. La signature doit être
+adaptée à un service/HSM avant activation ; `GLF_SIGNING_ENABLED` reste à `false`.
+Aucune clé de production n’a été générée. Les descriptions du parcours PEM
+ci-dessous concernent seulement le prototype initial, désormais insuffisant.
+
 ## CI, publication et clé GLF
 
 La CI doit construire le noyau contenant les `.cer` et l’UKI, puis les signer avec
