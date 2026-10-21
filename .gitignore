@@ -1,0 +1,8 @@
+# Sorties Nix à la racine du dépôt (liens ou répertoires).
+/result
+/result-*
+/dist/
+# Secrets locaux : la cle GLF ne doit jamais etre ajoutee au depot.
+/.secrets/
+*.key
+*.priv
