@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 let
-  cfg = config.glf.boot;
+  cfg = config.glf-securebootUKI;
   tools = pkgs.callPackage ./tools.nix { };
   rockyShim = pkgs.callPackage ./rocky-shim.nix { };
   kernel = config.boot.kernelPackages.kernel;
@@ -40,7 +40,7 @@ let
     canTouchEfiVariables = config.boot.loader.efi.canTouchEfiVariables;
   });
 in {
-  options.glf.boot = {
+  options.glf-securebootUKI = {
     enable = lib.mkEnableOption "la chaine shim Rocky -> systemd-boot -> UKI avec signature distante";
     install.enable = lib.mkOption {
       type = lib.types.bool;

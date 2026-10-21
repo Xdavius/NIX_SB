@@ -227,7 +227,7 @@ Les capacités de la version livrée par Rocky devront être vérifiées sépar�
 
 ## Intégration systemd-boot et glf-apps
 
-Le module est désormais opt-in via `glf.boot.enable`. Il expose un installateur
+Le module est désormais opt-in via `glf-securebootUKI.enable`. Il expose un installateur
 raccordé à `system.build.installBootLoader`, assemble l’UKI de la génération du
 poste, obtient ses signatures via GitHub, les vérifie puis installe la chaîne
 shim Rocky → systemd-boot signé → UKI signée. La clé reste dans GitHub.

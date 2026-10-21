@@ -1,7 +1,7 @@
 # A ajouter aux modules de la machine GLF-OS evaluee avec nixpkgs unstable.
 # Le module glfBoot doit deja etre reexporte/importe par la flake GLF-OS.
 { ... }: {
-  glf.boot = {
+  glf-securebootUKI = {
     enable = true;
     signing.github = {
       repository = "Xdavius/NIX_SB";

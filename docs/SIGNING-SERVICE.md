@@ -39,7 +39,7 @@ la bonne clé, est refusée.
 ## Accès du poste
 
 Fournir à root une authentification `gh` ou un fichier de jeton hors du store
-via `glf.boot.signing.github.tokenFile`. Le jeton doit pouvoir créer une release
+via `glf-securebootUKI.signing.github.tokenFile`. Le jeton doit pouvoir créer une release
 brouillon, envoyer ses assets, lancer le workflow et lire ses runs/artefacts.
 Ne jamais écrire le jeton dans un fichier Nix ou le committer.
 

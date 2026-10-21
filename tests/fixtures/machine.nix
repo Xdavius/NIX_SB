@@ -1,7 +1,7 @@
 # Machine fictive pour tester la CI, jamais une configuration de poste GLF-OS.
 # La vraie machine conserve ses fichiers /etc/nixos et sa configuration materielle.
 { ... }: {
-  glf.boot.enable = true;
+  glf-securebootUKI.enable = true;
   boot.uki.version = "prototype";
   networking.hostName = "glf-uki-prototype";
   fileSystems."/" = {

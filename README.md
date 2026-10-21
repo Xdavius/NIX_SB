@@ -14,12 +14,12 @@ paramètres et génération système.
 ## Import dans GLF-OS
 
 Le dépôt expose `nixosModules.default`, `overlays.default` et le paquet
-`glf-boot-tools`. L’import est sans effet tant que `glf.boot.enable` reste faux.
+`glf-boot-tools`. L’import est sans effet tant que `glf-securebootUKI.enable` reste faux.
 Le patch [integration/glf-os.patch](integration/glf-os.patch) prépare le passage
 par la flake `modules/glf-apps` de GLF-OS. Il n’a pas été appliqué au checkout
 externe ni à `/etc/nixos`.
 
-Une fois le module importé, `glf.boot.enable = true` raccorde l’installation à
+Une fois le module importé, `glf-securebootUKI.enable = true` raccorde l’installation à
 `nixos-rebuild boot/switch`, donc au parcours existant de `glf-update`.
 Voir [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md) pour les options et limites.
 

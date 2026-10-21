@@ -2,7 +2,10 @@
 
 Le projet expose un module NixOS opt-in (`nixosModules.default` ou `secureBoot`),
 un overlay (`overlays.default`) et le paquet `glf-boot-tools`. L’import seul ne
-change pas le démarrage ; `glf.boot.enable = true` active l’intégration.
+change pas le démarrage ; `glf-securebootUKI.enable = true` active l’intégration.
+
+Ce nom est distinct de `glf.boot.enable`, deja utilise par GLF-OS pour sa
+configuration generale du demarrage. Il n'y a pas d'alias entre ces options.
 
 ## Passage par glf-apps
 
@@ -34,7 +37,7 @@ Conserver les imports existants de `/etc/nixos#GLF-OS`, notamment le matériel,
 un module du poste ; voir [machine-example.nix](../integration/machine-example.nix).
 
 ```nix
-glf.boot = {
+glf-securebootUKI = {
   enable = true;
   signing.github = {
     repository = "Xdavius/NIX_SB";
