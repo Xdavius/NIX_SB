@@ -5,11 +5,6 @@ on:
   push:
     branches: [main, master, develop]
   workflow_dispatch:
-    inputs:
-      sign:
-        description: Signer avec la cle GLF de l'environnement protege
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -50,47 +45,5 @@ jobs:
         with:
           name: unsigned-${{ github.sha }}
           path: dist/unsigned/
-          if-no-files-found: error
-          retention-days: 7
-
-  sign-and-mock-publish:
-    if: >-
-      github.event_name == 'workflow_dispatch' && inputs.sign &&
-      github.ref_type == 'branch' && github.ref_protected &&
-      vars.GLF_SIGNING_ENABLED == 'true'
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    environment: glf-signing
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: unsigned-${{ github.sha }}
-          path: dist/unsigned/
-      # Realiser l'environnement AVANT de rendre les secrets disponibles.
-      - name: Preparer les outils de signature
-        run: nix print-dev-env --no-update-lock-file .#ci > /tmp/glf-signing-tools.sh
-      - name: Signer et verifier le noyau et l'UKI
-        env:
-          GLF_SIGNING_KEY_PEM: ${{ secrets.GLF_SIGNING_KEY_PEM }}
-          GLF_SIGNING_CERT_PEM: ${{ secrets.GLF_SIGNING_CERT_PEM }}
-          GLF_CERT_SHA256: ${{ vars.GLF_CERT_SHA256 }}
-        run: |
-          source /tmp/glf-signing-tools.sh
-          bash ci/sign.sh
-      - name: Simuler la publication Attic
-        run: |
-          source /tmp/glf-signing-tools.sh
-          bash ci/attic-mock.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: signed-${{ github.sha }}
-          path: |
-            dist/signed/
-            dist/attic-mock.json
           if-no-files-found: error
           retention-days: 7

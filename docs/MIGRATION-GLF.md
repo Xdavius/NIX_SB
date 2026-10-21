@@ -15,14 +15,14 @@ plus son activation sur tous les postes. Le correctif DEPMOD de v4l2loopback
 L'activation se fait par `iso-cfg/customConfig/secureboot-uki.nix`, à importer
 explicitement. Le système doit suivre la révision unstable verrouillée par
 `glf-os/glf-secureboot/nixpkgs`, conserver sa configuration matérielle et fournir
-un jeton GitHub hors du store. Lire `secureboot/README.md` dans GLF-OS.
+un jeton GitLab hors du store. Lire `secureboot/README.md` dans GLF-OS.
 
-NIX_SB reste le service GitHub de signature et conserve la clé privée de test.
-`ci/approved-source.json` fixe le commit GLF-OS dont les sorties sont autorisées.
-Le client ne peut pas choisir cette référence. Le build manuel et la validation
-des demandes utilisent cette source, y compris son stub et son ukify.
-Une mise à jour nécessite une revue du commit GLF-OS et de la référence côté
-signataire ; rien ne suit automatiquement la tête de develop.
+Le dépôt officiel retenu est `xdavius/glf-os`, branche dédiée
+`feature/secureboot-uki`. Le signataire GitLab construit les composants approuvés
+au commit de cette branche ayant déclenché le pipeline. La clé de production sera
+créée une seule fois en CI, dans une variable protégée, masquée et cachée ; son
+certificat public sera publié après validation. Le runner dédié reste à configurer.
+L'ancien service GitHub est désactivé. Voir `secureboot/docs/CI.md` dans GLF-OS.
 
 Les anciens répertoires nix/, pkgs/, integration/ et la flake de NIX_SB restent
 comme banc de tests historique ; ils ne sont plus la source du build signé de
@@ -35,4 +35,4 @@ des modules ; présence des 21 certificats des sept paquets dans le bundle ;
 démarrage QEMU Secure Boot avec le noyau complet, les deux drivers de volants
 chargés et un module altéré refusé. Le fonctionnement du matériel physique et
 le parcours de signature avec la clé persistante restent à valider après revue
-et activation du workflow sur main.
+et activation du signataire GitLab sur la branche dédiée.

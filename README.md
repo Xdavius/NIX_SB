@@ -4,9 +4,11 @@ L’implémentation système est désormais intégrée directement au dépôt GL
 dans `secureboot/`, sur la branche `feature/secureboot-uki`. Le module est importé
 par GLF-OS ; son activation passe par `glf-securebootUKI.enable` dans customConfig.
 
-Ce dépôt conserve le service GitHub et la clé privée de test. Le build signé
-utilise uniquement la révision GLF-OS verrouillée dans
-[ci/approved-source.json](ci/approved-source.json).
+Le dépôt officiel est désormais [xdavius/glf-os](https://framagit.org/xdavius/glf-os),
+branche dédiée `feature/secureboot-uki`. Le signataire et le provisionnement de la
+clé GLF-OS de production sont intégrés à sa CI GitLab. L'ancien signataire GitHub
+est désactivé ; la clé de test n'est pas convertie en clé de production.
+Le runner protégé et la création de la nouvelle clé restent à activer sur GitLab.
 
 Voir [MIGRATION-GLF.md](docs/MIGRATION-GLF.md) pour l’architecture, les tests et
 les conditions de déploiement. Les fichiers du prototype ci-dessous restent un
@@ -14,7 +16,7 @@ banc de tests historique et ne sont plus l’intégration à installer dans GLF-
 
 ---
 
-# GLF-OS — UKI, systemd-boot et Secure Boot
+# Historique du prototype — ne pas déployer ce parcours GitHub
 
 Prototype **NixOS unstable**, x86_64, avec la chaîne :
 

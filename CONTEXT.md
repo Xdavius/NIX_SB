@@ -1,3 +1,15 @@
+## Décision actuelle : signataire GitLab de production
+
+Référence officielle : `https://framagit.org/xdavius/glf-os`, branche dédiée
+`feature/secureboot-uki`. Ne pas modifier `develop`, liée au projet mère.
+L'implémentation active, le catalogue et la CI sont dans `secureboot/` de GLF-OS.
+La clé GLF-OS doit être créée une seule fois dans un job GitLab protégé et rester
+dans une variable protégée, masquée et cachée. Cette solution provisoire est
+acceptée : les jobs autorisés et administrateurs peuvent techniquement accéder
+à la clé. Aucune génération locale ni réutilisation de GLF-TEST en production.
+Le runner isolé et les protections GitLab restent à configurer avant bootstrap.
+Le signataire GitHub est désactivé. Les sections suivantes décrivent l'historique.
+
 # Contexte du prototype GLF-OS
 
 ## Objectif

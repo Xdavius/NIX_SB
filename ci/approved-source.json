@@ -1,3 +1,3 @@
 {
-  "flake": "git+https://framagit.org/gaming-linux-fr/glf-os/glf-os.git?ref=refs/merge-requests/409/head&rev=68c1061b0643de4f331f1088fef53c4b34757dfd&dir=secureboot"
+  "flake": "git+https://framagit.org/xdavius/glf-os.git?ref=feature/secureboot-uki&rev=73ff014686ed43ee9ab3154ee94eb61e7d837e44&dir=secureboot"
 }
