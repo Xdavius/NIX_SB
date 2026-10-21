@@ -31,10 +31,10 @@ L’UKI destinée à un poste doit être construite depuis sa propre configurati
 `/etc/nixos#GLF-OS`, utilisée par `glf-update`. Voir
 [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md).
 Le prototype construit le noyau enrichi via `rebuildImage` et une UKI qui le
-référence. La signature utilise une clé GLF persistante fournie par un environnement
+référence. La signature utilise une clé de test persistante fournie par un environnement
 GitHub protégé ; la publication Attic est simulée.
 
-Les modules maison et le déploiement du shim restent à raccorder. Aucune clé GLF
+Les modules maison et le déploiement du shim restent à raccorder. Aucune clé GLF de production
 n’est fournie, et aucun démarrage Secure Boot n’a été validé. Les instructions
 d’activation et les limites de sécurité figurent dans [docs/CI.md](docs/CI.md).
 
@@ -92,6 +92,7 @@ La CI ne crée pas de nouvelle clé GLF. La clé existante reste hors du dépôt
 store Nix. Le stockage GitHub Secrets est une première solution ; une clé non
 exportable nécessitera un service de signature ou HSM contrôlé par GLF.
 
-La clé GLF devra désormais être créée dans un service/HSM et rester **non
-exportable**. La signature est désactivée sur GitHub en attendant cette
-intégration ; le script PEM existant n’est pas la solution de production retenue.
+La signature est activée sur GitHub avec une **clé persistante réservée aux tests**.
+Son certificat public est [GLF-TEST.cer](certificates/GLF-TEST.cer). La clé privée
+est dans GitHub Secrets et reste techniquement accessible à un administrateur.
+La future clé de production reste distincte ; aucune clé de production n’a été créée.

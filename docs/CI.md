@@ -37,30 +37,44 @@ Le système complet référencé par l’UKI doit exister dans le store de la ma
 cible. Télécharger uniquement l’UKI et le noyau ne constitue pas une installation
 NixOS. Le déploiement du système, du shim Rocky et de MokManager reste à réaliser.
 
-## Exigence actuelle : clé non exportable
+## Mode actif : clé de test persistante
 
-La clé GLF n’existe pas encore. Elle doit être neuve, persistante et générée une
-seule fois dans un service de signature/HSM qui ne permet pas d’exporter sa partie
-privée, y compris par l’administrateur du dépôt. GitHub Secrets ne satisfait pas
-cette exigence : un administrateur peut modifier un workflow qui reçoit un secret.
+Une clé RSA 3072 bits dédiée aux tests a été créée le 21 octobre 2026. Son
+certificat porte le nom **GLF-OS TEST ONLY Secure Boot**, avec une validité d’un
+an. Elle est conservée dans `GLF_SIGNING_KEY_PEM`, au sein de l’environnement
+GitHub protégé `glf-signing`. Sa copie privée locale temporaire a été supprimée.
+La même clé est réutilisée entre les builds, sans régénération automatique.
 
-La signature reste donc désactivée (`GLF_SIGNING_ENABLED=false`). Aucun secret de
-signature n’a été créé. Le code actuel `ci/sign.sh` est un prototype de signature
-par fichier PEM, testé avec une clé jetable ; il doit être remplacé par un appel
-au service de signature avant l’activation. Le service, son compte et ses droits
-restent à définir. Le certificat public pourra ensuite être publié et enrôlé.
+Les fichiers [GLF-TEST.cer](../certificates/GLF-TEST.cer) (DER) et
+[GLF-TEST.pem](../certificates/GLF-TEST.pem) sont publics. L’empreinte SHA-256
+attendue est enregistrée dans la variable d’environnement GitHub `GLF_CERT_SHA256`.
+La signature et la vérification d’un stub EFI avec cette clé ont réussi localement.
 
-Le dépôt GitHub et le workflow sont publiés. L’environnement `glf-signing` est
-restreint à `main` et demande une validation de `Xdavius`. Cette validation peut
-être donnée par le déclencheur lui-même ; elle ne constitue pas une revue par une
-seconde personne. Les protections de branche imposent séparément une revue de PR.
+`GLF_SIGNING_ENABLED=true` autorise désormais le parcours PEM **pour les tests**.
+Le workflow doit toujours être déclenché manuellement sur `main` avec `sign=true`,
+puis approuvé dans l’environnement `glf-signing`. La création de la clé n’a pas
+lancé de compilation complète, de déploiement ou d’enrôlement MOK.
 
-### Ancien parcours PEM — non retenu pour la clé GLF
+Le certificat à enrôler sur la machine de test est `GLF-TEST.cer`. Le script
+existant conserve le nom technique `GLF.cer` dans les artefacts de signature :
+il s’agit du même certificat de test, identifiable par son sujet et son empreinte.
+Ne pas le présenter comme un certificat de production. La publication Attic reste
+simulée. Si le secret GitHub est perdu, cette clé n’a pas de sauvegarde privée
+locale : il faudra créer une autre clé de test et enrôler son nouveau certificat.
 
-La procédure suivante décrit le prototype existant. **Ne pas l’activer pour la
-clé GLF**, car elle ne respecte pas l’exigence de clé non exportable.
+L’administrateur du dépôt peut techniquement extraire un secret en modifiant un
+workflow. Cette limitation est acceptée uniquement pour la clé de test. La future
+clé GLF de production reste distincte et devra respecter l’exigence de
+non-exportabilité, si celle-ci est maintenue.
 
-### Configuration du prototype PEM
+L’environnement `glf-signing` est restreint à `main` et demande une validation de
+`Xdavius`. Cette validation peut être donnée par le déclencheur lui-même. Les
+protections de branche imposent séparément une revue de PR.
+
+### Configuration du parcours PEM de test
+
+La configuration suivante est déjà appliquée ; ne pas remplacer les secrets
+existants ni créer une nouvelle clé à chaque build.
 
 Configurer dans les paramètres GitHub, avant le premier lancement signé :
 
@@ -76,8 +90,8 @@ Configurer dans les paramètres GitHub, avant le premier lancement signé :
 5. Activer la variable de dépôt `GLF_SIGNING_ENABLED=true`, puis lancer le
    workflow depuis la branche protégée en cochant `sign`.
 
-La même clé GLF existante est réutilisée : la CI de publication ne génère et ne
-remplace jamais cette clé. Sa sauvegarde reste sous la responsabilité de GLF.
+La même clé de test est réutilisée : la CI de publication ne génère et ne
+remplace jamais cette clé.
 Une rotation éventuelle doit être une opération explicite accompagnée d’un
 nouvel enrôlement ; elle n’est pas automatisée ici.
 

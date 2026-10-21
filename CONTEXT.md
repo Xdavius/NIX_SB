@@ -33,7 +33,7 @@ reste à valider au démarrage.
 - Flake NixOS unstable verrouillée, cible initiale x86_64 et configuration extensible.
 - Sorties Nix pour le noyau enrichi des certificats, leur bundle et l’UKI non signée.
 - CI GitHub Actions : validations, build manuel, signature GLF et publication Attic simulée.
-- Aucun certificat GLF ni clé privée fourni ou généré pour la publication.
+- Certificat public de test disponible ; clé privée de test conservée dans GitHub Secrets.
 - Modules maison non encore raccordés ; le build utilise les modules NixOS sélectionnés.
 - Aucun démarrage Secure Boot validé ; le shim Rocky reste à intégrer au déploiement.
 
@@ -51,14 +51,18 @@ contrôlé par GLF, ou une construction centrale par configuration machine. La c
 privée GLF ne doit pas être distribuée aux postes. Ce raccordement à `glf-update`
 reste à implémenter ; voir [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md).
 
-## Nouvelle exigence pour la clé GLF
+## Clé de test et future clé de production
 
-La clé de production n’existe pas encore. Elle doit être créée une seule fois,
-puis rester non exportable, y compris pour l’administrateur GitHub. Le stockage
-dans GitHub Secrets n’est donc plus la solution retenue. La signature doit être
-adaptée à un service/HSM avant activation ; `GLF_SIGNING_ENABLED` reste à `false`.
-Aucune clé de production n’a été générée. Les descriptions du parcours PEM
-ci-dessous concernent seulement le prototype initial, désormais insuffisant.
+Une clé RSA 3072 bits persistante dédiée aux tests a été créée et enregistrée dans
+l’environnement GitHub `glf-signing`. Son certificat public est
+`certificates/GLF-TEST.cer`, avec le sujet `GLF-OS TEST ONLY Secure Boot`.
+`GLF_SIGNING_ENABLED=true` active le parcours PEM uniquement pour cette clé de
+test. La copie privée temporaire locale a été supprimée. La signature d’un stub
+EFI a été vérifiée, sans lancer le build complet ni enrôler le certificat.
+
+La limitation de GitHub Secrets (extraction techniquement possible par un
+administrateur) est acceptée pour les tests. La clé GLF de production n’existe
+pas encore ; son exigence de non-exportabilité reste un sujet distinct.
 
 ## CI, publication et clé GLF
 
