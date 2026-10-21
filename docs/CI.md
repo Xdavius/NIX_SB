@@ -12,8 +12,9 @@ temps et en disque, se lance par **Run workflow**. L’architecture initiale est
 
 `flake.lock` verrouille `nixos-unstable`. Le module `nix/secure-boot.nix` :
 
-1. Active la vérification obligatoire des signatures de modules et le lockdown
-   en mode integrity.
+1. Embarque `module.sig_enforce=1` et `lockdown=integrity` dans la ligne de
+   commande protégée par la signature de l’UKI. Le noyau conserve la configuration
+   native nixpkgs et ses signatures kmodigest.
 2. Utilise les signatures déterministes et les certificats produits par
    `kmodigest` dans nixpkgs.
 3. Récupère `modules.cer` dans `system.modulesTree`, qui agrège les modules du
@@ -39,7 +40,7 @@ définition Nix locale. Les applications vont dans `environment.systemPackages`.
 
 Le système complet référencé par l’UKI doit exister dans le store de la machine
 cible. Télécharger uniquement l’UKI et le noyau ne constitue pas une installation
-NixOS. Le déploiement du système, du shim Rocky et de MokManager reste à réaliser.
+NixOS. Le module fournit l’installation sur l’ESP du shim, de MokManager, de systemd-boot et de l’UKI ; son activation sur les postes reste à réaliser.
 
 ## Mode actif : clé de test persistante
 
@@ -102,7 +103,7 @@ nouvel enrôlement ; elle n’est pas automatisée ici.
 Le job de signature utilise un runner GitHub hébergé distinct du build. Les outils
 sont préparés avant l’injection des secrets. Le script écrit la clé dans un
 répertoire temporaire privé, vérifie l’empreinte et la correspondance clé/certificat,
-signe le noyau et l’UKI avec `sbsign`, puis vérifie avec `sbverify`. La clé est
+signe le noyau, systemd-boot et l’UKI avec `sbsign`, puis vérifie avec `sbverify`. La clé est
 retirée de l’environnement des sous-processus après sa copie et le répertoire
 temporaire est supprimé à la sortie. Seuls les fichiers publics sont archivés.
 
@@ -146,18 +147,37 @@ par l’UKI, ShellCheck et un test de signature sur un stub EFI avec une clé
 mauvaise empreinte, d’une clé incompatible et d’un artefact modifié. Cette clé
 de test ne peut pas servir de repli à la signature GLF.
 
-Ces contrôles ne prouvent pas le démarrage Secure Boot. Restent à valider la
-compilation complète, les modules maison, l’injection effective des certificats
-dans le noyau exécuté, la compatibilité shim/SBAT, l’enrôlement GLF et les refus
-de chargement sur une cible UEFI.
+Vérifié localement le 21 octobre 2026 : évaluation Nix (dont le contrat d’import
+et la conservation des paramètres machine), Actionlint, ShellCheck, signature,
+installation de deux générations et retour à la précédente sur ESP simulée,
+refus des réponses altérées et tests du client GitHub avec API simulée.
+Le noyau enrichi 6.18.57, l’UKI et les outils ont été construits réellement.
+Les paramètres signés imposent la vérification des modules et lockdown integrity.
 
-Vérifié localement le 21 octobre 2026 : évaluation de toutes les sorties Nix,
-Actionlint, ShellCheck, tests de signature et génération effective de la
-configuration du noyau 6.18.57. Cette configuration active `MODULE_SIG_FORCE`,
-`MODULE_SIG_ALL`, `LOCK_DOWN_KERNEL_FORCE_INTEGRITY` et réserve 3 120 000 octets
-pour `SYSTEM_EXTRA_CERTIFICATE`. La compilation complète n’a pas été exécutée.
+Le test QEMU/OVMF vérifie le démarrage via shim Rocky et systemd-boot avec une
+clé jetable présente uniquement dans MOK, Secure Boot actif, lockdown integrity,
+le chargement d’efivarfs signé par kmodigest et le rejet du même module altéré.
+Il ne teste pas l’interface interactive d’enrôlement MokManager, les deux modules
+maison, le firmware physique ni la signature distante réelle après fusion.
+La clé jetable de VM est indépendante de la clé GLF conservée dans GitHub.
 
 Références : [kmodigest](https://github.com/emilazy/boot-security-tools/tree/main/kmodigest),
 [rebuild-image.nix à la révision verrouillée](https://github.com/NixOS/nixpkgs/blob/02c087f3fe673c9e317f206a627cb6b910336dbe/pkgs/os-specific/linux/kernel/rebuild-image.nix),
 [environnements GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments),
 [CLI Attic](https://docs.attic.rs/reference/attic-cli.html).
+
+## Signature des machines et installation
+
+`sign-request.yml` fournit le parcours distant décrit dans
+[SIGNING-SERVICE.md](SIGNING-SERVICE.md). La CI de build signe désormais aussi
+`systemd-bootx64.efi`. Le module opt-in fournit l’installateur exécuté par
+`nixos-rebuild boot/switch` ; le workflow doit être fusionné sur `main` avant usage.
+Les tests d’installation assemblent de vraies UKI et vérifient les signatures sur
+une ESP simulée, y compris le refus d’une réponse signée au contenu différent.
+
+Test UEFI facultatif (QEMU/OVMF, sans accès au firmware hôte) :
+
+```sh
+nix build .#kernel --out-link result-kernel
+nix develop .#vm --command python3 tests/test_uefi.py result-kernel/bzImage
+```

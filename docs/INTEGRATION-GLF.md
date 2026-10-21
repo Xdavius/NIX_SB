@@ -1,78 +1,126 @@
-# UKI de la machine GLF-OS
+# Intégration GLF-OS : shim → systemd-boot → UKI
 
-## Configuration faisant autorité
+Le projet expose un module NixOS opt-in (`nixosModules.default` ou `secureBoot`),
+un overlay (`overlays.default`) et le paquet `glf-boot-tools`. L’import seul ne
+change pas le démarrage ; `glf.boot.enable = true` active l’intégration.
 
-Le `glf-update` installé sur le poste utilise `/etc/nixos#GLF-OS` pour construire
-et installer le système. L’UKI doit être dérivée de cette même configuration
-NixOS : matériel, disques, initrd, paramètres noyau, modules et chemin `init` du
-système construit. Elle ne doit pas provenir d’une machine générique de la CI.
+## Passage par glf-apps
 
-`nix/secure-boot.nix` est un **module NixOS complémentaire** : il ajoute les
-options de vérification des modules, le noyau enrichi des certificats et la
-référence à ce noyau dans l’UKI. Il conserve le choix de `boot.kernelPackages`
-de la machine. Il est exporté sous `nixosModules.secureBoot` et
-`nixosModules.default`.
-
-`tests/fixtures/machine.nix` est une **machine fictive réservée aux tests**. C’est
-l’ancien `project.nix`, déplacé pour expliciter ce rôle. Son disque `GLF_ROOT`
-et ses pilotes virtio ne décrivent pas les postes GLF-OS.
-
-## Intégration prévue
-
-Ajouter ce dépôt comme input verrouillé de la flake qui décrit le poste, puis
-ajouter son module à la liste existante, en conservant tous les autres imports :
-
-```nix
-# Dans les modules de nixosConfigurations."GLF-OS" :
-modules = [
-  ./configuration.nix
-  ./customized.nix
-  glf.nixosModules.default
-  glf-uki.nixosModules.secureBoot
-];
-```
-
-`glf-uki` désigne l’input de ce dépôt, à déclarer dans la flake du poste. Pour ce
-prototype, la configuration entière doit être évaluée avec NixOS unstable et une
-révision prenant en charge `kmodigest` et `kernelPackages.rebuildImage`.
-Le module ne remplace pas discrètement la base nixpkgs de la machine.
-
-Après intégration, les sorties à construire sont celles du poste :
+Le patch [integration/glf-os.patch](../integration/glf-os.patch) est préparé pour
+le checkout GLF-OS consulté. Il ajoute cet input à `modules/glf-apps/flake.nix`,
+compose son overlay avec celui des applications, réexporte son module et importe
+ce dernier dans le module racine GLF-OS. Examiner puis appliquer dans GLF-OS :
 
 ```sh
-nix build /etc/nixos#nixosConfigurations.GLF-OS.config.system.build.glfKernel
-nix build /etc/nixos#nixosConfigurations.GLF-OS.config.system.build.uki
+git apply --check /chemin/NIX_SB/integration/glf-os.patch
+git apply /chemin/NIX_SB/integration/glf-os.patch
 ```
 
-Ces commandes construisent des artefacts non signés GLF. Importer le module ne
-suffit pas à installer l’UKI sur l’ESP ni à l’intégrer au cycle de `glf-update`.
-Ce raccordement doit construire, faire signer, vérifier puis installer l’UKI de
-la même génération, avant de déclarer la mise à jour réussie.
+La référence de développement est `configure-test-signing`, en attendant la fusion
+sur `main`. Verrouiller le commit de l’input dans les locks utilisés par GLF-OS.
+Le prototype exige **NixOS unstable**, notamment `kmodigest` et `rebuildImage` :
+le simple ajout d’un input unstable ne transforme pas une configuration système
+construite avec nixpkgs stable en configuration unstable.
 
-## Signature et rôle de la CI
+Pour les dépôts d’applications importés avec `flake = false`, `default.nix`
+permet aussi `pkgs.callPackage glf-boot-source { }` pour les outils ; le module
+s’importe via `"${glf-boot-source}/nix/secure-boot.nix"`. L’overlay seul n’active
+pas le chargeur.
 
-La CI peut préconstruire et mettre en cache des noyaux et modules pour des
-configurations définies. Une UKI complète contient également des éléments
-propres au poste : une UKI générique ne convient donc pas à toutes les machines.
+## Configuration du poste
 
-Si l’UKI est assemblée sur le poste par le parcours `glf-update`, sa signature
-avec la clé GLF exige un service de signature contrôlé par GLF. Ce service devra
-authentifier et autoriser les demandes et vérifier les artefacts à signer : il ne
-doit pas signer arbitrairement toute image reçue. La clé GLF reste côté GLF.
-L’autre possibilité est de faire construire et signer chaque configuration
-machine par une infrastructure centrale qui dispose de sa définition exacte.
+Conserver les imports existants de `/etc/nixos#GLF-OS`, notamment le matériel,
+`configuration.nix`, `customized.nix` et `customConfig`. Ajouter l’activation dans
+un module du poste ; voir [machine-example.nix](../integration/machine-example.nix).
 
-Ce choix et son protocole restent à implémenter. La CI actuelle ne signe que les
-artefacts de sa machine de test. Elle ne fournit pas encore une chaîne de mise à
-jour signée utilisable par les postes.
+```nix
+glf.boot = {
+  enable = true;
+  signing.github = {
+    repository = "Xdavius/NIX_SB";
+    ref = "main";
+    tokenFile = "/run/credentials/glf-github-token";
+    allowPublicArtifacts = false;
+  };
+};
+```
 
-## État de cette correction
+Le certificat public attendu est par défaut `GLF-TEST.pem`. Aucune clé privée de
+signature n’est nécessaire sur le poste. Le jeton GitHub (droits de création de
+releases brouillon, lancement de workflows et lecture des artefacts) doit être
+fourni hors du store, dans un fichier accessible uniquement à root. Avec
+`tokenFile = null`, les outils utilisent l’authentification `gh` du compte qui
+installe le chargeur, généralement root. Un secret dans un fichier utilisateur
+n’est pas automatiquement disponible à `sudo glf-update`.
 
-Les fichiers de test sont distingués du module réutilisable et le module préserve
-le noyau choisi par la machine. Aucun fichier de `/etc/nixos`, ni le programme
-`glf-update` installé, n’a été modifié. Aucun rebuild ou déploiement du poste n’a
-été lancé.
+Le dépôt actuel est public : les **artefacts signés**, contenant l’initrd, peuvent
+être téléchargés. Utiliser un dépôt privé équipé du même workflow ou autoriser
+explicitement `allowPublicArtifacts = true` pour une machine de test dont les
+images peuvent être publiques. Les secrets d’initrd NixOS sont refusés par une
+assertion ; cela ne détecte pas d’éventuels secrets ajoutés manuellement ailleurs.
 
-Le support distinct d’enrôlement de test avec shim Rocky et MokManager est
-désormais disponible : voir [ENROLLMENT.md](ENROLLMENT.md). Il ne remplace pas
-l’intégration de l’UKI au déploiement du poste.
+## Cycle de glf-update
+
+`glf-update` utilise `nixos-rebuild build` puis `nixos-rebuild boot`. L’intégration
+remplace `system.build.installBootLoader`, donc aucun patch du script glf-update
+n’est nécessaire. Lors de `boot` ou `switch` :
+
+1. Lire `glf-boot.json` dans la génération exacte fournie par NixOS.
+2. Assembler l’UKI avec son noyau enrichi, son initrd, ses paramètres et son `init`.
+3. Soumettre les trois images (noyau, UKI, systemd-boot) dans une release brouillon
+   GitHub portant un identifiant unique et un manifeste SHA-256.
+4. Lancer `sign-request.yml` sur `main`, puis attendre l’approbation de
+   `glf-signing`. Le responsable doit examiner la demande avant de l’approuver.
+5. Vérifier localement les signatures et l’identité du contenu PE retourné,
+   hors champs Authenticode, avant d’écrire les fichiers amorçables.
+6. Installer une UKI propre à la génération et mettre à jour le défaut du menu.
+
+La clé persistante reste dans GitHub Secrets. Le service n’exécute pas les images
+soumises. Il vérifie le manifeste, ne signe que trois noms de fichiers fixes et
+retourne des artefacts. Les demandes brouillon sont conservées pour audit et
+peuvent être supprimées manuellement après usage ; elles ne sont jamais publiées
+automatiquement. L’échec ou le refus de signature fait échouer l’installation.
+Les fichiers de démarrage précédents restent alors inchangés.
+
+## Fichiers installés
+
+```text
+EFI/GLF/shimx64.efi              shim Rocky signé par Microsoft
+EFI/GLF/mmx64.efi                MokManager Rocky
+EFI/GLF/grubx64.efi              systemd-boot signé GLF (ce n’est pas GRUB)
+EFI/BOOT/BOOTX64.EFI             shim, chemin UEFI de secours
+EFI/BOOT/mmx64.efi               MokManager
+EFI/BOOT/grubx64.efi             systemd-boot signé GLF
+EFI/systemd/systemd-bootx64.efi  copie signée au chemin standard
+EFI/Linux/glf-<generation>.efi  UKI signée propre à la génération
+loader/loader.conf              défaut, délai, éditeur désactivé
+```
+
+Le nom `grubx64.efi` satisfait le chemin de second étage attendu par le shim Rocky.
+Le binaire installé à ce nom est **systemd-boot**, à la différence du support
+séparé d’enrôlement où c’est MokManager. systemd-boot utilise le protocole shim
+pour vérifier les images signées avec MOK.
+
+L’installateur ne lance pas `bootctl install`, qui remplacerait le shim de secours.
+Le service automatique de mise à jour systemd-boot est désactivé pour éviter le
+remplacement du chargeur signé par un binaire non signé. Si
+`boot.loader.efi.canTouchEfiVariables` est vrai, l’installateur crée une entrée
+UEFI `GLF-OS shim` si ce chemin n’existe pas, et fixe le défaut systemd-boot.
+
+## Générations et limites
+
+Les anciennes UKI sont conservées pour le retour arrière. Réinstaller une ancienne
+génération compatible remet son entrée par défaut après signature ; les anciens
+systèmes sans `glf-boot.json` ne sont pas convertis automatiquement. La purge des
+UKI anciennes reste manuelle : surveiller l’espace libre de l’ESP et conserver les
+générations NixOS correspondantes pour éviter que leur closure soit collectée.
+
+Cette première intégration prend en charge x86_64, une seule ESP FAT montée,
+sans XBOOTLDR ni spécialisations. Elle ne déploie pas automatiquement sur le poste
+de développement. La signature nécessite Internet, un jeton GitHub et une
+approbation ; ce n’est pas une mise à jour hors ligne.
+
+Le workflow de signature doit d’abord être fusionné sur la branche protégée
+`main`. Tant que la PR n’est pas fusionnée, le parcours distant ne peut pas être
+activé en conditions réelles. Les tests locaux emploient un signataire de test
+jetable pour vérifier les signatures et l’installation, sans extraire la clé GLF.

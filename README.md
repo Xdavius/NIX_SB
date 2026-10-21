@@ -1,107 +1,66 @@
-# GLF-OS — Prototype UKI et Secure Boot
+# GLF-OS — UKI, systemd-boot et Secure Boot
 
-Ce dépôt prépare un prototype de noyau GLF-OS distribué sous forme d’**UKI
-(Unified Kernel Image) signée**, destiné à démarrer avec **UEFI Secure Boot** et
-à charger nos **modules noyau maison signés**.
+Prototype **NixOS unstable**, x86_64, avec la chaîne :
 
-Le prototype utilise exclusivement **NixOS unstable**, avec une révision de
-`nixpkgs` verrouillée. GLF-OS reste la cible d’intégration.
+```text
+UEFI → shim signé Rocky → systemd-boot signé GLF → UKI signée GLF
+```
 
-Le dépôt principal est [glf-os](https://framagit.org/gaming-linux-fr/glf-os/glf-os).
-Si sa configuration est nécessaire, utiliser la branche **`develop`** et
-verrouiller un commit en cas d’intégration au build.
+Les certificats des modules sélectionnés sont produits par `kmodigest`, agrégés
+par NixOS, puis injectés dans le noyau via `kernelPackages.rebuildImage`.
+L’UKI utilise la configuration complète de la machine : matériel, initrd,
+paramètres et génération système.
 
-Le démarrage utilisera le **shim déjà signé de Rocky Linux** et son
-**MokManager** pour enrôler le certificat public **GLF** via MOK. L’UKI sera signée
-avec la clé GLF : le projet n’aura ainsi pas à faire signer son propre shim par
-Microsoft. La version du shim et le parcours exact de chargement restent à valider.
+## Import dans GLF-OS
 
-Le travail inclut la prise en compte des certificats publics `.cer` associés aux
-modules dans la confiance du noyau. D’après les précisions du projet, ces fichiers
-sont générés par **`kmodigest` dans NixOS** : le prototype devra les récupérer
-depuis le build, sans exiger leur ajout manuel au dépôt.
-La signature de l’UKI et la validation des
-signatures des modules constituent deux aspects distincts à configurer et tester.
+Le dépôt expose `nixosModules.default`, `overlays.default` et le paquet
+`glf-boot-tools`. L’import est sans effet tant que `glf.boot.enable` reste faux.
+Le patch [integration/glf-os.patch](integration/glf-os.patch) prépare le passage
+par la flake `modules/glf-apps` de GLF-OS. Il n’a pas été appliqué au checkout
+externe ni à `/etc/nixos`.
 
-## État du projet
+Une fois le module importé, `glf.boot.enable = true` raccorde l’installation à
+`nixos-rebuild boot/switch`, donc au parcours existant de `glf-update`.
+Voir [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md) pour les options et limites.
 
-Une flake NixOS unstable verrouillée et une CI GitHub Actions sont présentes.
-**Les sorties actuelles de la CI concernent une machine fictive de test.**
-L’UKI destinée à un poste doit être construite depuis sa propre configuration
-`/etc/nixos#GLF-OS`, utilisée par `glf-update`. Voir
-[INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md).
-Le prototype construit le noyau enrichi via `rebuildImage` et une UKI qui le
-référence. La signature utilise une clé de test persistante fournie par un environnement
-GitHub protégé ; la publication Attic est simulée.
+## Signature distante
 
-Les modules maison et le déploiement du shim restent à raccorder. Aucune clé GLF de production
-n’est fournie, et aucun démarrage Secure Boot n’a été validé. Les instructions
-d’activation et les limites de sécurité figurent dans [docs/CI.md](docs/CI.md).
+La clé persistante **de test** reste uniquement dans GitHub Secrets. Le poste
+soumet ses images à `sign-request.yml`, attend l’approbation de `glf-signing`,
+vérifie les signatures et le contenu retourné, puis installe les fichiers.
+Le certificat public est [GLF-TEST.cer](certificates/GLF-TEST.cer).
 
-## Objectifs du prototype
+Ce parcours demande un accès GitHub sur le poste et un workflow fusionné sur
+`main`. Les images d’une machine sont potentiellement sensibles : les artefacts
+d’un dépôt public nécessitent une autorisation explicite dans la configuration.
+Aucune clé de production n’a été créée. Voir [SIGNING-SERVICE.md](docs/SIGNING-SERVICE.md).
 
-- Définir une configuration NixOS unstable reproductible pour le prototype GLF-OS.
-- Assembler et signer une UKI contenant notamment le noyau et l’initrd.
-- Intégrer les certificats nécessaires à la validation des modules maison.
-- Permettre l’ajout déclaratif de paquets locaux ou issus de dépôts Git externes.
-- Vérifier le démarrage avec Secure Boot actif et le chargement des modules signés.
-- Vérifier le refus des signatures invalides ou non approuvées.
+## Sorties de la flake
 
-## Modules de départ et ajout de paquets
-
-Les premiers modules à intégrer sont `hid-fanatek` (nom à vérifier dans la source)
-et `new-lg4ff`, indiqués dans le dépôt
-[app-glf-os](https://framagit.org/gaming-linux-fr/glf-os/app-glf-os).
-
-Le prototype devra permettre d’ajouter d’autres modules noyau ainsi que des
-paquets applicatifs ou utilitaires :
-
-- depuis des définitions et sources présentes dans ce projet ;
-- depuis l’URL d’un dépôt Git externe, avec une révision verrouillée et une
-  définition de build Nix fournie par le dépôt ou écrite localement.
-
-Les modules noyau devront être construits pour le noyau cible et suivre le
-parcours de signature et de confiance des certificats. Les paquets ordinaires
-seront intégrés au système selon leur usage ; leur ajout n’implique pas de les
-embarquer dans l’UKI.
-
-Sur un poste, les paquets se déclarent dans sa configuration NixOS, via
-`boot.extraModulePackages` et `environment.systemPackages`. Le fichier
-[tests/fixtures/machine.nix](tests/fixtures/machine.nix) ne sert qu’aux tests de CI. Les sources Git
-s’ajoutent comme inputs verrouillés dans la flake. Les deux paquets maison restent
-à raccorder à cette interface.
-
-## Contenu du dépôt
-
-| Fichier | Rôle |
+| Sortie | Usage |
 | --- | --- |
-| [flake.nix](flake.nix) | Sorties noyau, certificats et UKI ; outils de CI. |
-| [.github/workflows/uki.yml](.github/workflows/uki.yml) | Validation, build manuel, signature et Attic simulé. |
-| [docs/CI.md](docs/CI.md) | Configuration de la CI, secrets GLF et tests. |
-| [CONTEXT.md](CONTEXT.md) | Contexte, décisions à prendre, plan et critères de validation. |
-| [README.md](README.md) | Présentation et état du prototype. |
-| [.gitignore](.gitignore) | Exclusion des sorties de build Nix `result` et `result-*` à la racine. |
+| `.#kernel`, `.#uki`, `.#certificates` | Artefacts de la machine fictive de CI. |
+| `.#systemd-boot` | systemd-boot non signé, destiné à l’étape de signature. |
+| `.#rocky-shim` | Shim Rocky et MokManager signés, conservés intacts. |
+| `.#enrollment` | Dossier USB d’enrôlement du certificat de test. |
+| `.#glf-boot-tools` | Client GitHub et installateur des générations. |
 
-## Prochaines étapes
+Les paquets et modules d’un vrai poste se déclarent dans sa configuration NixOS,
+via `environment.systemPackages` et `boot.extraModulePackages`. Les sources
+peuvent être locales ou venir d’inputs Git verrouillés. Construire les modules
+externes avec `config.boot.kernelPackages` pour respecter le noyau choisi.
 
-Configurer l’environnement GitHub `glf-signing`, raccorder les modules maison et
-lancer le build manuel. Valider ensuite le démarrage avec le shim Rocky,
-l’enrôlement GLF et le chargement des modules sous Secure Boot.
+## Vérification
 
-La CI ne crée pas de nouvelle clé GLF. La clé existante reste hors du dépôt et du
-store Nix. Le stockage GitHub Secrets est une première solution ; une clé non
-exportable nécessitera un service de signature ou HSM contrôlé par GLF.
+```sh
+nix develop .#ci --command bash ci/check.sh
+nix build .#kernel .#uki .#glf-boot-tools
+```
 
-La signature est activée sur GitHub avec une **clé persistante réservée aux tests**.
-Son certificat public est [GLF-TEST.cer](certificates/GLF-TEST.cer). La clé privée
-est dans GitHub Secrets et reste techniquement accessible à un administrateur.
-La future clé de production reste distincte ; aucune clé de production n’a été créée.
+[CI.md](docs/CI.md) décrit les vérifications et la publication Attic simulée.
+[ENROLLMENT.md](docs/ENROLLMENT.md) décrit MokManager. Le support d’enrôlement
+reste distinct du démarrage normal par systemd-boot.
 
-## Enrôlement du certificat de test
-
-Le shim Rocky signé et son MokManager sont fournis par `.#rocky-shim`.
-`nix build .#enrollment --out-link result-enrollment` assemble un dossier à
-copier sur une partition USB FAT32 de test, avec le certificat public. La CI
-publie également cet artefact, sans attendre le build complet du noyau.
-Voir [ENROLLMENT.md](docs/ENROLLMENT.md) pour le contenu et la procédure MOK.
-L’enrôlement sur une cible UEFI reste à valider.
+Les fonctionnalités sont destinées au prototype. La validation sur le matériel
+GLF-OS et le parcours distant après fusion du workflow restent nécessaires avant
+utilisation sur un poste réel.

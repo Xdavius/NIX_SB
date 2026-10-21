@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     os.chdir(temp)
     unsigned = Path("dist/unsigned")
     unsigned.mkdir(parents=True)
-    for name in ("kernel.efi", "glf-os.efi"):
+    for name in ("kernel.efi", "glf-os.efi", "systemd-bootx64.efi"):
         shutil.copyfile(stub, unsigned / name)
     (unsigned / "modules.cer").write_bytes(b"fixture-certificates")
     (unsigned / "bundle.sha256").write_text("fixture\n")
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     (unsigned / "store-paths.txt").write_text("/nix/store/fixture\n")
     hashes = "".join(
         f"{hashlib.sha256((unsigned / name).read_bytes()).hexdigest()}  {name}\n"
-        for name in ("kernel.efi", "glf-os.efi", "modules.cer", "bundle.sha256")
+        for name in ("kernel.efi", "glf-os.efi", "systemd-bootx64.efi", "modules.cer", "bundle.sha256")
     )
     (unsigned / "SHA256SUMS").write_text(hashes)
     run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",

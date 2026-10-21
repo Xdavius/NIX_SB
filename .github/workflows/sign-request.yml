@@ -1,0 +1,53 @@
+name: Sign machine boot images
+run-name: ${{ inputs.request_tag }}
+on:
+  workflow_dispatch:
+    inputs:
+      request_tag:
+        description: Draft release contenant les images a examiner
+        type: string
+        required: true
+      request_sha256:
+        description: SHA256 du manifeste request.json
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  sign:
+    if: >-
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      vars.GLF_SIGNING_ENABLED == 'true'
+    environment: glf-signing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - name: Preparer les outils sans les secrets
+        run: nix print-dev-env --no-update-lock-file .#ci > /tmp/glf-sign-tools.sh
+      - name: Telecharger et verifier la demande approuvee
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_TAG: ${{ inputs.request_tag }}
+          REQUEST_SHA256: ${{ inputs.request_sha256 }}
+        run: |
+          source /tmp/glf-sign-tools.sh
+          python3 ci/validate-request.py
+      - name: Signer uniquement les images validees
+        env:
+          GLF_SIGNING_KEY_PEM: ${{ secrets.GLF_SIGNING_KEY_PEM }}
+          GLF_SIGNING_CERT_PEM: ${{ secrets.GLF_SIGNING_CERT_PEM }}
+          GLF_CERT_SHA256: ${{ vars.GLF_CERT_SHA256 }}
+        run: |
+          source /tmp/glf-sign-tools.sh
+          bash ci/sign.sh
+          cp dist/unsigned/request.json dist/signed/request.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ inputs.request_tag }}
+          path: dist/signed/
+          retention-days: 7
+          if-no-files-found: error

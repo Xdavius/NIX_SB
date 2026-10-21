@@ -9,7 +9,7 @@ les modules noyau maison signés avec les certificats correspondants.
 Le prototype doit prendre en compte les certificats publics `.cer` de ces
 modules dans la chaîne de confiance du noyau. Le mécanisme retenu est
 `kernelPackages.rebuildImage` avec le `system.modulesTree` agrégé ; son résultat
-reste à valider au démarrage.
+est validé en VM avec un module NixOS signé et sa variante altérée.
 
 ## Choix actés pour le prototype
 
@@ -37,7 +37,7 @@ reste à valider au démarrage.
 - Modules maison non encore raccordés ; le build utilise les modules NixOS sélectionnés.
 - Shim signé Rocky 16.1-2.el10 et MokManager empaquetés sans modification ;
   dossier d’enrôlement de test disponible via `.#enrollment`.
-- Aucun démarrage Secure Boot validé ; le déploiement sur les postes reste à réaliser.
+- Démarrage Secure Boot validé en QEMU/OVMF via shim Rocky et systemd-boot ; le déploiement sur les postes reste à réaliser.
 
 ## Configuration machine et glf-update
 
@@ -51,7 +51,7 @@ Les sorties actuelles de la flake et du workflow restent des artefacts de test.
 L’assemblage local d’une UKI propre au poste implique un parcours de signature
 contrôlé par GLF, ou une construction centrale par configuration machine. La clé
 privée GLF ne doit pas être distribuée aux postes. Ce raccordement à `glf-update`
-reste à implémenter ; voir [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md).
+est fourni par l’installateur du module ; voir [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md).
 
 ## Clé de test et future clé de production
 
@@ -71,7 +71,7 @@ pas encore ; son exigence de non-exportabilité reste un sujet distinct.
 La CI doit construire le noyau contenant les `.cer` et l’UKI, puis les signer avec
 la même clé privée GLF persistante. Le build Nix s’exécute sans cette clé. La
 signature se fait dans un job séparé, sur branche protégée et via l’environnement
-GitHub `glf-signing`, à configurer par les responsables GLF.
+GitHub `glf-signing`, déjà configuré pour la clé de test.
 
 Sans infrastructure de signature dédiée, la première implémentation utilise des
 secrets d’environnement GitHub. La clé ne doit apparaître ni dans le dépôt, ni
@@ -156,10 +156,10 @@ alimentent `system.modulesTree` et le bundle de certificats injecté.
 
 ## Démarrage via le shim Rocky et enrôlement GLF
 
-Le parcours cible est : firmware UEFI avec Secure Boot actif → shim signé Rocky
-Linux → UKI signée GLF, avec un éventuel chargeur intermédiaire si l’intégration
-le nécessite. Le chargement direct de l’UKI reste à tester avec la version exacte
-du shim retenue ; il ne constitue pas encore un résultat acquis.
+Le parcours retenu et testé en VM est : firmware UEFI avec Secure Boot actif →
+shim signé Rocky Linux → systemd-boot signé GLF → UKI signée GLF.
+Le nom `grubx64.efi` attendu par le shim contient systemd-boot dans l’installation
+normale. Le support d’enrôlement seul y place MokManager.
 
 L’enrôlement concerne le **certificat public** GLF dans la liste MOK gérée par
 shim, et non la clé privée ni un remplacement des clés du firmware. Prévoir une
@@ -177,36 +177,16 @@ son propre parcours de validation.
 Référence de fonctionnement : [documentation amont de shim](https://github.com/rhboot/shim/blob/main/README.md).
 Les capacités de la version livrée par Rocky devront être vérifiées séparément.
 
-## Points à préciser avant l’implémentation
+## Travail restant sur cible
 
-- Commit de GLF-OS sur `develop` si nécessaire, version du noyau et architecture cible.
-- Révision de NixOS unstable à verrouiller et stratégie de mise à jour des dépendances.
-- Composition de l’UKI : noyau, initrd, ligne de commande et métadonnées.
-- Compatibilité DBX/SBAT et firmware du shim Rocky 16.1-2.el10 x86_64 retenu ;
-  paquet officiel verrouillé par empreinte dans `nix/rocky-shim.nix`.
-- Chemins EFI et chargement de l’UKI via ce shim, directement ou avec un chargeur
-  intermédiaire ; procédure d’enrôlement MOK du certificat GLF.
-- Préservation des sorties DER `.ko.cer` de `kmodigest` par les paquets maison
-  et validation de leur présence dans le bundle injecté.
-- Définitions de `hid-fanatek` et `new-lg4ff`, méthode de compilation et étape de signature.
-- Interface d’ajout des paquets locaux et Git, sélection des définitions Nix et
-  verrouillage des révisions externes.
-- Configuration effective de l’environnement GitHub protégé, sauvegarde GLF de
-  la clé persistante et évolution éventuelle vers un service de signature/HSM.
-- Environnement de validation : machine virtuelle UEFI et/ou machine de test.
-
-## Plan de travail envisagé
-
-1. Définir une configuration NixOS unstable reproductible pour le prototype GLF-OS.
-   Prévoir l’interface des paquets locaux et Git, avec les deux modules de référence.
-2. Produire un noyau et un initrd, puis assembler une UKI.
-3. Récupérer les `.cer` générés par `kmodigest` et intégrer la confiance nécessaire
-   aux certificats des modules maison.
-4. Vérifier les signatures kmodigest des modules, puis signer le noyau final et
-   l’UKI avec la clé persistante GLF, hors du build Nix.
-5. Intégrer le shim signé Rocky et son MokManager, enrôler le certificat GLF,
-   puis tester le démarrage avec Secure Boot actif et le chargement des modules.
-6. Documenter les commandes, les résultats et les limites du prototype.
+- Fusionner le workflow distant sur la branche protégée, puis tester une demande
+  avec la clé GLF de test conservée dans GitHub.
+- Appliquer l’intégration glf-apps à une configuration de test entièrement unstable.
+- Construire et charger `hid-fanatek` et `new-lg4ff` pour le noyau sélectionné.
+- Tester l’enrôlement interactif MOK et la compatibilité DBX/SBAT du firmware réel.
+- Vérifier le refus des images EFI non approuvées sur ce matériel.
+- Prévoir la gestion de l’espace ESP, les mises à jour hors ligne et l’évolution
+  du service de signature avant une utilisation de production.
 
 ## Critères de validation
 
@@ -244,3 +224,25 @@ Les capacités de la version livrée par Rocky devront être vérifiées sépar�
   globalement par `.gitignore`.
 - Les sorties Nix `result` et `result-*` à la racine sont ignorées.
 - Ne pas considérer une étape comme validée sans résultat de test consigné.
+
+## Intégration systemd-boot et glf-apps
+
+Le module est désormais opt-in via `glf.boot.enable`. Il expose un installateur
+raccordé à `system.build.installBootLoader`, assemble l’UKI de la génération du
+poste, obtient ses signatures via GitHub, les vérifie puis installe la chaîne
+shim Rocky → systemd-boot signé → UKI signée. La clé reste dans GitHub.
+Le service attend une revue manuelle ; il n’est utilisable qu’après fusion de
+`sign-request.yml` sur `main`. Les artefacts publics sont refusés par défaut côté
+client. Les anciennes UKI sont conservées, sans purge automatique.
+
+Le paquet est importable via `callPackage`, l’overlay et le module sont exportés
+par la flake. `integration/glf-os.patch` raccorde ces exports à `glf-apps` et au
+module racine GLF-OS ; il est fourni pour revue, sans modification du checkout
+externe. L’UKI signée embarque `module.sig_enforce=1` et `lockdown=integrity`, ce
+qui évite de recompiler le noyau de base uniquement pour forcer ces options.
+Le noyau enrichi et l’UKI de test ont été construits réellement.
+
+Validation locale : noyau et UKI construits ; test QEMU/OVMF avec Secure Boot,
+clé éphémère MOK, lockdown integrity, module efivarfs signé accepté et version
+altérée refusée. Le parcours GitHub réel attend la fusion du workflow sur main.
+Les modules maison et l’enrôlement interactif restent à tester sur cible.
