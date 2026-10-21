@@ -6,6 +6,7 @@
   outputs = { self, nixpkgs }: let
     system = "x86_64-linux";
     pkgs = import nixpkgs { inherit system; };
+    rockyShim = pkgs.callPackage ./nix/rocky-shim.nix { };
     # Machine fictive pour la CI uniquement. Les postes GLF importent le module
     # secureBoot dans leur propre nixosConfigurations."GLF-OS".
     target = nixpkgs.lib.nixosSystem {
@@ -18,6 +19,8 @@
     nixosModules.default = self.nixosModules.secureBoot;
     nixosConfigurations.prototype = target;
     packages.${system} = {
+      rocky-shim = rockyShim;
+      enrollment = pkgs.callPackage ./nix/enrollment.nix { inherit rockyShim; };
       kernel = target.config.system.build.glfKernel;
       uki = target.config.system.build.uki;
       certificates = target.config.system.build.glfCertificates;

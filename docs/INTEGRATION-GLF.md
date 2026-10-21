@@ -72,3 +72,7 @@ Les fichiers de test sont distingués du module réutilisable et le module prés
 le noyau choisi par la machine. Aucun fichier de `/etc/nixos`, ni le programme
 `glf-update` installé, n’a été modifié. Aucun rebuild ou déploiement du poste n’a
 été lancé.
+
+Le support distinct d’enrôlement de test avec shim Rocky et MokManager est
+désormais disponible : voir [ENROLLMENT.md](ENROLLMENT.md). Il ne remplace pas
+l’intégration de l’UKI au déploiement du poste.

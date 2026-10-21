@@ -96,3 +96,12 @@ La signature est activée sur GitHub avec une **clé persistante réservée aux 
 Son certificat public est [GLF-TEST.cer](certificates/GLF-TEST.cer). La clé privée
 est dans GitHub Secrets et reste techniquement accessible à un administrateur.
 La future clé de production reste distincte ; aucune clé de production n’a été créée.
+
+## Enrôlement du certificat de test
+
+Le shim Rocky signé et son MokManager sont fournis par `.#rocky-shim`.
+`nix build .#enrollment --out-link result-enrollment` assemble un dossier à
+copier sur une partition USB FAT32 de test, avec le certificat public. La CI
+publie également cet artefact, sans attendre le build complet du noyau.
+Voir [ENROLLMENT.md](docs/ENROLLMENT.md) pour le contenu et la procédure MOK.
+L’enrôlement sur une cible UEFI reste à valider.

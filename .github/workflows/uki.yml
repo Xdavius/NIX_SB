@@ -28,6 +28,12 @@ jobs:
           persist-credentials: false
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
       - run: nix develop --no-update-lock-file .#ci --command bash ci/check.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: enrollment-x64-${{ github.sha }}
+          path: result-enrollment/
+          if-no-files-found: error
+          retention-days: 7
 
   build:
     if: github.event_name == 'workflow_dispatch'

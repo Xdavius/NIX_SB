@@ -22,7 +22,11 @@ temps et en disque, se lance par **Run workflow**. L’architecture initiale est
    certificats dans le noyau final avec `insert-sys-cert`.
 5. Construit une UKI dont la section Linux utilise explicitement ce noyau enrichi.
 
-Les sorties sont `.#kernel`, `.#certificates` et `.#uki`. Le build ne reçoit
+Les sorties système sont `.#kernel`, `.#certificates` et `.#uki`.
+Les sorties `.#rocky-shim` et `.#enrollment` fournissent séparément le shim Rocky
+signé et le dossier d’enrôlement. Le job `validate` construit et publie ce dernier
+comme artefact `enrollment-x64-<commit>`, sans clé privée ni build complet du noyau.
+Voir [ENROLLMENT.md](ENROLLMENT.md). Le build ne reçoit
 aucune clé GLF. Les modules `hid-fanatek` et `new-lg4ff` ne sont pas encore
 raccordés : le build initial utilise les modules du noyau NixOS. Leur ajout se
 fait dans la configuration de la machine avec `boot.extraModulePackages` (dans

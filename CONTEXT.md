@@ -35,7 +35,9 @@ reste à valider au démarrage.
 - CI GitHub Actions : validations, build manuel, signature GLF et publication Attic simulée.
 - Certificat public de test disponible ; clé privée de test conservée dans GitHub Secrets.
 - Modules maison non encore raccordés ; le build utilise les modules NixOS sélectionnés.
-- Aucun démarrage Secure Boot validé ; le shim Rocky reste à intégrer au déploiement.
+- Shim signé Rocky 16.1-2.el10 et MokManager empaquetés sans modification ;
+  dossier d’enrôlement de test disponible via `.#enrollment`.
+- Aucun démarrage Secure Boot validé ; le déploiement sur les postes reste à réaliser.
 
 ## Configuration machine et glf-update
 
@@ -180,8 +182,8 @@ Les capacités de la version livrée par Rocky devront être vérifiées sépar�
 - Commit de GLF-OS sur `develop` si nécessaire, version du noyau et architecture cible.
 - Révision de NixOS unstable à verrouiller et stratégie de mise à jour des dépendances.
 - Composition de l’UKI : noyau, initrd, ligne de commande et métadonnées.
-- Version et source officielle du shim signé Rocky et de son MokManager,
-  architecture, empreintes et compatibilité DBX/SBAT.
+- Compatibilité DBX/SBAT et firmware du shim Rocky 16.1-2.el10 x86_64 retenu ;
+  paquet officiel verrouillé par empreinte dans `nix/rocky-shim.nix`.
 - Chemins EFI et chargement de l’UKI via ce shim, directement ou avec un chargeur
   intermédiaire ; procédure d’enrôlement MOK du certificat GLF.
 - Préservation des sorties DER `.ko.cer` de `kmodigest` par les paquets maison
