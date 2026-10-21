@@ -1,3 +1,19 @@
+# GLF-OS — service de signature Secure Boot
+
+L’implémentation système est désormais intégrée directement au dépôt GLF-OS,
+dans `secureboot/`, sur la branche `feature/secureboot-uki`. Le module est importé
+par GLF-OS ; son activation passe par `glf-securebootUKI.enable` dans customConfig.
+
+Ce dépôt conserve le service GitHub et la clé privée de test. Le build signé
+utilise uniquement la révision GLF-OS verrouillée dans
+[ci/approved-source.json](ci/approved-source.json).
+
+Voir [MIGRATION-GLF.md](docs/MIGRATION-GLF.md) pour l’architecture, les tests et
+les conditions de déploiement. Les fichiers du prototype ci-dessous restent un
+banc de tests historique et ne sont plus l’intégration à installer dans GLF-OS.
+
+---
+
 # GLF-OS — UKI, systemd-boot et Secure Boot
 
 Prototype **NixOS unstable**, x86_64, avec la chaîne :

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-test -f flake.lock
+flake_ref=$(python3 ci/approved_source.py)
 mkdir -p dist/unsigned
-nix build --no-update-lock-file .#kernel .#uki .#certificates .#systemd-boot --out-link result
+nix build --no-update-lock-file "$flake_ref#kernel" "$flake_ref#uki" "$flake_ref#certificates" "$flake_ref#systemd-boot" --out-link result
 kernel=$(readlink -f result)
 uki=$(readlink -f result-1)
 certs=$(readlink -f result-2)

@@ -1,3 +1,7 @@
+> Intégration native : voir [MIGRATION-GLF.md](MIGRATION-GLF.md).
+> La source du build signé est désormais `ci/approved-source.json` ; les exemples
+> d’import du prototype séparé ci-dessous sont historiques.
+
 # CI du prototype
 
 La CI utilise GitHub Actions pour une **machine fictive de test**. Ses artefacts

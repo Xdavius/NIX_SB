@@ -1,3 +1,7 @@
+> Intégration native : voir [MIGRATION-GLF.md](MIGRATION-GLF.md).
+> La source du build signé est désormais `ci/approved-source.json` ; les exemples
+> d’import du prototype séparé ci-dessous sont historiques.
+
 # Intégration GLF-OS : shim → systemd-boot → UKI
 
 Le projet expose un module NixOS opt-in (`nixosModules.default` ou `secureBoot`),

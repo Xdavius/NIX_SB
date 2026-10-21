@@ -251,3 +251,11 @@ La signature distante reconstruit le noyau et le chargeur depuis le dépôt prot
 contrôle le noyau embarqué et reconstitue l’UKI avec le stub approuvé. Elle refuse
 une image issue d’un catalogue modifié localement. La revue du dépôt détermine
 la confiance ; les fichiers .cer ajoutés manuellement ne sont pas importés.
+
+## Intégration native GLF-OS
+
+Le code système a été intégré dans GLF-OS/secureboot, branche
+feature/secureboot-uki. Le catalogue de sept paquets est distinct de leur
+activation conditionnelle. Le noyau et NVIDIA ont une définition partagée avec
+les modules GLF-OS. Le service GitHub reste ici et vérifie les sorties de la
+révision immuable définie dans ci/approved-source.json. Voir docs/MIGRATION-GLF.md.

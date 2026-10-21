@@ -1,3 +1,7 @@
+> Intégration native : voir [MIGRATION-GLF.md](MIGRATION-GLF.md).
+> La source du build signé est désormais `ci/approved-source.json` ; les exemples
+> d’import du prototype séparé ci-dessous sont historiques.
+
 # Signature GitHub sans clé privée sur le poste
 
 Le workflow `.github/workflows/sign-request.yml` signe des demandes provenant de
