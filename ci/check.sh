@@ -12,5 +12,6 @@ nix eval --raw "$flake_ref#packages.x86_64-linux.uki.drvPath"
 python3 ci/test-signing.py "$GLF_TEST_STUB"
 python3 tests/test_boot.py
 python3 tests/test_github_sign.py
+python3 tests/test_signing_policy.py
 nix build --no-update-lock-file "$flake_ref#enrollment" --out-link result-enrollment
 (cd result-enrollment && sha256sum --check SHA256SUMS)

@@ -4,13 +4,20 @@ let
   tools = pkgs.callPackage ./tools.nix { };
   rockyShim = pkgs.callPackage ./rocky-shim.nix { };
   kernel = config.boot.kernelPackages.kernel;
-  modulesTree = config.system.modulesTree;
+  approvedModules = import ../pkgs/repo { kernelPackages = config.boot.kernelPackages; };
+  approvedPackages = builtins.attrValues approvedModules;
+  # Ne jamais utiliser le bundle ouvert de config.system.modulesTree ici.
+  modulesTree = pkgs.aggregateModules ([ (lib.getOutput "modules" kernel) ] ++ approvedPackages);
   image = config.boot.kernelPackages.rebuildImage { inherit modulesTree; };
   certificates = pkgs.runCommand "glf-module-certificates" { } ''
     mkdir -p "$out"
     cp ${modulesTree}/lib/modules/${kernel.modDirVersion}/modules.cer "$out/modules.cer"
     test -s "$out/modules.cer"
     sha256sum "$out/modules.cer" | cut -d' ' -f1 > "$out/bundle.sha256"
+    cp ${pkgs.writeText "approved-modules.json" (builtins.toJSON {
+      kernel = toString (lib.getOutput "modules" kernel);
+      modules = lib.mapAttrs (_: package: toString package) approvedModules;
+    })} "$out/approved-modules.json"
   '';
   metadata = pkgs.writeText "glf-boot.json" (builtins.toJSON {
     version = 1;
@@ -62,6 +69,8 @@ in {
   };
   config = lib.mkIf cfg.enable {
     assertions = [
+      { assertion = builtins.all (package: builtins.elem (toString package) (map toString approvedPackages)) config.boot.extraModulePackages;
+        message = "GLF Secure Boot : module externe non approuve. Ajouter sa definition et ses sources verrouillees dans pkgs/repo, puis faire valider le catalogue avant signature."; }
       { assertion = pkgs.stdenv.hostPlatform.system == "x86_64-linux"; message = "GLF Secure Boot supporte actuellement x86_64-linux uniquement."; }
       { assertion = config.boot.kernelPackages ? rebuildImage; message = "GLF Secure Boot exige nixpkgs unstable avec kmodigest et rebuildImage."; }
       { assertion = config.boot.initrd.secrets == { }; message = "Ne pas envoyer d'initrd contenant boot.initrd.secrets au signataire distant."; }
@@ -70,6 +79,7 @@ in {
       { assertion = !config.boot.loader.grub.enable; message = "GLF Secure Boot utilise systemd-boot ; desactiver GRUB."; }
     ];
     system.build.glfKernel = image;
+    system.build.glfApprovedModules = modulesTree;
     system.build.glfCertificates = certificates;
     system.build.glfBootMetadata = metadata;
     system.build.glfInstallerConfig = installerConfig;
@@ -80,6 +90,7 @@ in {
     # Nixpkgs signe deja les modules avec kmodigest. Ces parametres sont
     # embarques dans l'UKI signee et imposent la verification au demarrage.
     boot.kernelParams = [ "module.sig_enforce=1" "lockdown=integrity" ];
+    boot.extraModulePackages = approvedPackages;
     boot.loader.systemd-boot.enable = true;
     boot.loader.systemd-boot.editor = false;
     boot.loader.supportsInitrdSecrets = lib.mkForce false;
@@ -94,7 +105,7 @@ in {
         exec ${tools}/bin/glf-install-boot --config ${installerConfig} "$@"
       ''
     ));
-    # rebuildImage injecte les certificats de tous les modules selectionnes
+    # rebuildImage injecte uniquement les certificats du catalogue et du noyau
     # apres leur compilation, sans boucle noyau -> modules -> noyau.
     boot.uki.settings.UKI.Linux = "${image}/${config.system.boot.loader.kernelFile}";
     boot.uki.name = lib.mkDefault "glf-os";

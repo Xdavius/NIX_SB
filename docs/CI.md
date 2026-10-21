@@ -17,8 +17,8 @@ temps et en disque, se lance par **Run workflow**. L’architecture initiale est
    native nixpkgs et ses signatures kmodigest.
 2. Utilise les signatures déterministes et les certificats produits par
    `kmodigest` dans nixpkgs.
-3. Récupère `modules.cer` dans `system.modulesTree`, qui agrège les modules du
-   noyau et `boot.extraModulePackages`.
+3. Construit un arbre de confiance séparé avec les modules natifs du noyau et
+   uniquement les paquets de `pkgs/repo/default.nix`, puis récupère `modules.cer`.
 4. Appelle `kernelPackages.rebuildImage { modulesTree = …; }` pour injecter ces
    certificats dans le noyau final avec `insert-sys-cert`.
 5. Construit une UKI dont la section Linux utilise explicitement ce noyau enrichi.
@@ -28,15 +28,11 @@ Les sorties `.#rocky-shim` et `.#enrollment` fournissent séparément le shim Ro
 signé et le dossier d’enrôlement. Le job `validate` construit et publie ce dernier
 comme artefact `enrollment-x64-<commit>`, sans clé privée ni build complet du noyau.
 Voir [ENROLLMENT.md](ENROLLMENT.md). Le build ne reçoit
-aucune clé GLF. Les modules `hid-fanatek` et `new-lg4ff` ne sont pas encore
-raccordés : le build initial utilise les modules du noyau NixOS. Leur ajout se
-fait dans la configuration de la machine avec `boot.extraModulePackages` (dans
-`tests/fixtures/machine.nix` seulement pour les tests), en utilisant le même
-`config.boot.kernelPackages`. Les définitions des paquets externes doivent
-préserver le mécanisme `kmodigest` et leurs `.ko.cer` ; leur chargement devra être
-testé. Une source Git peut être ajoutée comme input verrouillé, avec
-`flake = false` si elle ne fournit pas de flake, puis construite par une
-définition Nix locale. Les applications vont dans `environment.systemPackages`.
+aucune clé GLF. Les deux modules maison sont définis dans `pkgs/repo` et compilés
+pour le noyau approuvé. Leurs `.ko.cer` ont été retrouvés dans le bundle injecté.
+Les modules ajoutés hors catalogue dans `boot.extraModulePackages` sont refusés ;
+un ajout direct à `system.modulesTree` n’alimente pas le bundle approuvé.
+Voir [le catalogue](../pkgs/repo/README.md) pour ajouter un driver local ou Git.
 
 Le système complet référencé par l’UKI doit exister dans le store de la machine
 cible. Télécharger uniquement l’UKI et le noyau ne constitue pas une installation
@@ -157,8 +153,9 @@ Les paramètres signés imposent la vérification des modules et lockdown integr
 Le test QEMU/OVMF vérifie le démarrage via shim Rocky et systemd-boot avec une
 clé jetable présente uniquement dans MOK, Secure Boot actif, lockdown integrity,
 le chargement d’efivarfs signé par kmodigest et le rejet du même module altéré.
-Il ne teste pas l’interface interactive d’enrôlement MokManager, les deux modules
-maison, le firmware physique ni la signature distante réelle après fusion.
+Le test inclut aussi le chargement des deux modules maison (sans périphérique
+physique). Il ne teste pas l’interface interactive d’enrôlement MokManager,
+le fonctionnement des volants, le firmware physique ni la signature distante réelle après fusion.
 La clé jetable de VM est indépendante de la clé GLF conservée dans GitHub.
 
 Références : [kmodigest](https://github.com/emilazy/boot-security-tools/tree/main/kmodigest),

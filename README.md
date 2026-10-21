@@ -6,7 +6,7 @@ Prototype **NixOS unstable**, x86_64, avec la chaîne :
 UEFI → shim signé Rocky → systemd-boot signé GLF → UKI signée GLF
 ```
 
-Les certificats des modules sélectionnés sont produits par `kmodigest`, agrégés
+Les certificats des modules natifs et du catalogue GLF approuvé sont produits par `kmodigest`, agrégés
 par NixOS, puis injectés dans le noyau via `kernelPackages.rebuildImage`.
 L’UKI utilise la configuration complète de la machine : matériel, initrd,
 paramètres et génération système.
@@ -45,10 +45,17 @@ Aucune clé de production n’a été créée. Voir [SIGNING-SERVICE.md](docs/SI
 | `.#enrollment` | Dossier USB d’enrôlement du certificat de test. |
 | `.#glf-boot-tools` | Client GitHub et installateur des générations. |
 
-Les paquets et modules d’un vrai poste se déclarent dans sa configuration NixOS,
-via `environment.systemPackages` et `boot.extraModulePackages`. Les sources
-peuvent être locales ou venir d’inputs Git verrouillés. Construire les modules
-externes avec `config.boot.kernelPackages` pour respecter le noyau choisi.
+Les modules externes approuvés sont définis dans
+[pkgs/repo/default.nix](pkgs/repo/default.nix) : `hid-fanatek` et `new-lg4ff`.
+Le bundle de confiance est indépendant des ajouts de la configuration du poste.
+Un nouveau driver, local ou Git, exige une modification revue de ce catalogue ;
+voir [la procédure](pkgs/repo/README.md). Les applications ordinaires restent
+librement sélectionnables via `environment.systemPackages`.
+
+Le signataire compare le noyau et systemd-boot aux builds du dépôt protégé et
+reconstitue l’UKI avec le stub approuvé. Modifier le catalogue localement ne
+suffit donc pas à obtenir une signature GitHub. Le noyau et les paquets du poste
+doivent correspondre à la révision approuvée par le service.
 
 ## Vérification
 

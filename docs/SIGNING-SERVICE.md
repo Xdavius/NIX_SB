@@ -14,12 +14,19 @@ empreinte est transmise séparément à `workflow_dispatch`.
 
 Le responsable examine la demande brouillon avant d’approuver l’environnement
 `glf-signing`. Cette approbation est une autorisation de signer ces images, pas
-une simple formalité : le service ne démontre pas que les images ont été
-construites à partir de sources approuvées. Seuls les collaborateurs autorisés à
+une simple formalité : le noyau, le chargeur et le stub sont contrôlés contre le
+dépôt approuvé, mais le contenu de l’initrd et la configuration du poste restent
+à examiner. Seuls les collaborateurs autorisés à
 créer des releases et lancer les workflows peuvent soumettre une demande.
 
 Le job de signature télécharge uniquement les quatre fichiers attendus, vérifie
-le manifeste et le format PE x86_64, puis rend la clé disponible exclusivement
+le manifeste et le format PE x86_64. Il construit le noyau et systemd-boot depuis
+le checkout protégé et exige leur identité avec les images soumises. Il extrait
+les sections de données de l’UKI, impose `module.sig_enforce=1` et
+`lockdown=integrity`, reconstruit l’UKI avec le stub approuvé et compare le résultat.
+Un stub modifié, un autre noyau embarqué ou une section supplémentaire sont refusés.
+Le bundle de confiance vient uniquement des modules natifs et de `pkgs/repo`.
+Le job rend ensuite la clé disponible exclusivement
 à l’étape de signature. Il ne décompresse ni n’exécute le contenu des images.
 Il publie les images signées et le manifeste comme artefact pendant sept jours.
 

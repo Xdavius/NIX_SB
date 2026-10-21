@@ -28,7 +28,7 @@ for file in kernel.efi glf-os.efi systemd-bootx64.efi; do
   sbverify --cert "$secret_dir/cert.pem" "dist/signed/$file"
 done
 openssl x509 -in "$secret_dir/cert.pem" -outform DER -out dist/signed/GLF.cer
-for file in modules.cer bundle.sha256 nix-closure.json store-paths.txt; do
+for file in modules.cer bundle.sha256 approved-modules.json nix-closure.json store-paths.txt; do
   if [[ -f dist/unsigned/$file ]]; then cp "dist/unsigned/$file" dist/signed/; fi
 done
 (cd dist/signed && sha256sum kernel.efi glf-os.efi systemd-bootx64.efi GLF.cer > SHA256SUMS)

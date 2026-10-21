@@ -35,6 +35,28 @@ with tempfile.TemporaryDirectory(prefix="glf-uefi-") as temp:
     index = corrupt.index(b"description=") + len(b"description=")
     corrupt[index] ^= 1
     (initrd_root / "corrupt.ko").write_bytes(corrupt)
+    driver_commands = []
+    installed = set()
+    for driver in ('hid-fanatec', 'hid-logitech-new'):
+        version = next((Path(os.environ['GLF_VM_MODULES']) / 'lib/modules').iterdir()).name
+        deps = subprocess.check_output(['modprobe', '--show-depends', '-d', os.environ['GLF_VM_MODULES'],
+                                        '-S', version, driver], text=True)
+        for line in deps.splitlines():
+            if not line.startswith('insmod '):
+                continue
+            source = Path(line.split()[1])
+            if source in installed:
+                continue
+            installed.add(source)
+            name = f'driver-{len(installed)}.ko'
+            data = source.read_bytes()
+            if source.suffix == '.xz':
+                data = lzma.decompress(data)
+            elif source.suffix == '.zst':
+                data = subprocess.check_output(['zstd', '-dc', str(source)])
+            (initrd_root / name).write_bytes(data)
+            driver_commands.append(f'insmod /{name} || {{ echo GLF_DRIVER_FAILED; poweroff -f; }}')
+        driver_commands.append(f'echo GLF_DRIVER_OK_{driver}')
     for app in ("sh", "mount", "umount", "insmod", "rmmod", "mkdir", "cat", "od", "sleep", "poweroff"):
         (initrd_root / "bin" / app).symlink_to("busybox")
     (initrd_root / "init").write_text('''#!/bin/sh
@@ -59,10 +81,11 @@ printf 'GLF_LOCKDOWN='
 cat /sys/kernel/security/lockdown
 printf 'GLF_CMDLINE='
 cat /proc/cmdline
+__DRIVER_COMMANDS__
 echo GLF_UEFI_BOOT_OK
 sleep 1
 poweroff -f
-''')
+'''.replace('__DRIVER_COMMANDS__', '\n'.join(driver_commands)))
     (initrd_root / "init").chmod(0o755)
     files = ["."] + [str(p.relative_to(initrd_root)) for p in initrd_root.rglob("*")]
     archive = subprocess.check_output(["cpio", "-o", "-H", "newc"], input=("\n".join(files) + "\n").encode(), cwd=initrd_root)
@@ -109,6 +132,8 @@ poweroff -f
         Path("dist/uefi-serial.log").write_text(text)
     assert "GLF_UEFI_BOOT_OK" in text, "Le noyau n'a pas atteint /init : voir dist/uefi-serial.log"
     assert "[integrity]" in text, "Lockdown integrity absent"
+    for driver in ('hid-fanatec', 'hid-logitech-new'):
+        assert f'GLF_DRIVER_OK_{driver}' in text, f'Module {driver} non charge'
     assert "GLF_CORRUPTED_MODULE_REJECTED" in text, "Module corrompu non rejete"
     assert "Key was rejected" in text, "Rejet de signature non confirme"
     secure_line = next(line for line in text.splitlines() if "GLF_SECURE_BOOT=" in line)

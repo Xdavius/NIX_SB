@@ -12,7 +12,15 @@ let
     modules = [ self.nixosModules.default ];
   };
   cfg = customized.config;
+  unapproved = target.extendModules {
+    modules = [ ({ pkgs, ... }: { boot.extraModulePackages = [ pkgs.hello ]; }) ];
+  };
+  injectedTree = target.extendModules {
+    modules = [ ({ pkgs, ... }: { system.modulesTree = [ pkgs.hello ]; }) ];
+  };
 in
+assert builtins.any (entry: !entry.assertion && pkgs.lib.hasInfix "module externe non approuve" entry.message) unapproved.config.assertions;
+assert injectedTree.config.system.build.glfKernel.outPath == target.config.system.build.glfKernel.outPath;
 assert disabled.config.glf.boot.enable == false;
 assert !(disabled.config.system.build ? glfKernel);
 assert cfg.networking.hostName == "glf-real-machine";

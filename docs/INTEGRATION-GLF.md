@@ -124,3 +124,18 @@ Le workflow de signature doit d’abord être fusionné sur la branche protégé
 `main`. Tant que la PR n’est pas fusionnée, le parcours distant ne peut pas être
 activé en conditions réelles. Les tests locaux emploient un signataire de test
 jetable pour vérifier les signatures et l’installation, sans extraire la clé GLF.
+
+## Catalogue de drivers approuvés
+
+Le module installe les deux drivers de `pkgs/repo/default.nix` et injecte
+exclusivement leurs certificats et ceux du noyau natif. Retirer les anciennes
+déclarations de ces drivers dans `boot.extraModulePackages` lorsqu’elles
+proviennent d’autres définitions/overlays : elles ne doivent pas faire doublon.
+Les autres modules externes (Wi-Fi, NVIDIA, VirtualBox, etc.) doivent être ajoutés
+au catalogue et revus avant usage avec cette politique.
+
+Le signataire accepte uniquement le noyau et le chargeur du dépôt protégé :
+aligner la révision nixpkgs du poste sur le `flake.lock` approuvé. Changer le noyau,
+un driver ou son compilateur peut produire une autre image qui sera refusée.
+Le matériel, l’initrd, les systèmes de fichiers et les applications restent propres
+au poste. Voir [pkgs/repo/README.md](../pkgs/repo/README.md).

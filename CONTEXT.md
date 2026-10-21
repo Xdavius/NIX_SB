@@ -8,7 +8,7 @@ les modules noyau maison signés avec les certificats correspondants.
 
 Le prototype doit prendre en compte les certificats publics `.cer` de ces
 modules dans la chaîne de confiance du noyau. Le mécanisme retenu est
-`kernelPackages.rebuildImage` avec le `system.modulesTree` agrégé ; son résultat
+`kernelPackages.rebuildImage` avec un arbre de confiance séparé (noyau natif + catalogue `pkgs/repo`) ; son résultat
 est validé en VM avec un module NixOS signé et sa variante altérée.
 
 ## Choix actés pour le prototype
@@ -34,7 +34,7 @@ est validé en VM avec un module NixOS signé et sa variante altérée.
 - Sorties Nix pour le noyau enrichi des certificats, leur bundle et l’UKI non signée.
 - CI GitHub Actions : validations, build manuel, signature GLF et publication Attic simulée.
 - Certificat public de test disponible ; clé privée de test conservée dans GitHub Secrets.
-- Modules maison non encore raccordés ; le build utilise les modules NixOS sélectionnés.
+- Modules maison raccordés dans `pkgs/repo` ; leurs certificats sont présents dans le bundle approuvé.
 - Shim signé Rocky 16.1-2.el10 et MokManager empaquetés sans modification ;
   dossier d’enrôlement de test disponible via `.#enrollment`.
 - Démarrage Secure Boot validé en QEMU/OVMF via shim Rocky et systemd-boot ; le déploiement sur les postes reste à réaliser.
@@ -105,10 +105,9 @@ est la source indiquée pour les deux premiers modules à intégrer :
 - `hid-fanatek` (nom communiqué, orthographe et attribut Nix à vérifier dans la source) ;
 - `new-lg4ff`.
 
-Les chemins des définitions, révisions et dépendances restent à relever dans ce
-dépôt. Les sorties `.cer` générées par `kmodigest` pour ces modules restent à
-identifier dans le build NixOS. Ces deux modules serviront de premiers
-cas de validation, sans limiter le prototype à leur prise en charge.
+Les définitions sont maintenant dans `pkgs/repo/hid-fanatek` et
+`pkgs/repo/new-lg4ff`, avec versions et hashes verrouillés et installation Kbuild
+préservant kmodigest. `pkgs/repo/default.nix` est la liste de confiance revue.
 
 ## Exigence d’extension aux paquets
 
@@ -120,8 +119,8 @@ Le prototype doit permettre d’ajouter des paquets depuis deux types de sources
 
 L’ajout doit passer par une configuration déclarative extensible, sans modifier
 le mécanisme central d’assemblage et de signature de l’UKI pour chaque paquet.
-Le point d’extension est la configuration NixOS du poste : `boot.extraModulePackages`
-pour les modules et `environment.systemPackages` pour les autres paquets. Les
+Le point d’extension des modules est le catalogue revu `pkgs/repo/default.nix`.
+`environment.systemPackages` reste le point d’extension des applications. Les
 sources externes se déclarent comme inputs verrouillés dans `flake.nix` ; les
 définitions de build peuvent être locales ou fournies par ces inputs.
 
@@ -142,8 +141,9 @@ Distinguer deux usages dans cette configuration :
 
 Les références aux certificats publics doivent être séparées des références aux
 clés privées. L’ajout d’un dépôt Git ne suffit pas à accorder la confiance à ses
-modules : seuls les paquets explicitement sélectionnés dans la configuration
-alimentent `system.modulesTree` et le bundle de certificats injecté.
+modules : seuls le noyau natif et les paquets approuvés dans `pkgs/repo`
+alimentent le bundle de certificats injecté. Le bundle ouvert de la machine
+n’est plus utilisé pour établir la confiance.
 
 ## Distinction des chaînes de confiance
 
@@ -246,3 +246,8 @@ Validation locale : noyau et UKI construits ; test QEMU/OVMF avec Secure Boot,
 clé éphémère MOK, lockdown integrity, module efivarfs signé accepté et version
 altérée refusée. Le parcours GitHub réel attend la fusion du workflow sur main.
 Les modules maison et l’enrôlement interactif restent à tester sur cible.
+
+La signature distante reconstruit le noyau et le chargeur depuis le dépôt protégé,
+contrôle le noyau embarqué et reconstitue l’UKI avec le stub approuvé. Elle refuse
+une image issue d’un catalogue modifié localement. La revue du dépôt détermine
+la confiance ; les fichiers .cer ajoutés manuellement ne sont pas importés.

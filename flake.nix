@@ -7,6 +7,7 @@
     system = "x86_64-linux";
     pkgs = import nixpkgs { inherit system; };
     rockyShim = pkgs.callPackage ./nix/rocky-shim.nix { };
+    approvedModules = import ./pkgs/repo { kernelPackages = target.config.boot.kernelPackages; };
     # Machine fictive pour la CI uniquement. Les postes GLF importent le module
     # secureBoot dans leur propre nixosConfigurations."GLF-OS".
     target = nixpkgs.lib.nixosSystem {
@@ -23,6 +24,7 @@
     nixosModules.default = self.nixosModules.secureBoot;
     nixosConfigurations.prototype = target;
     packages.${system} = {
+      inherit (approvedModules) hid-fanatek new-lg4ff;
       rocky-shim = rockyShim;
       glf-boot-tools = pkgs.callPackage ./nix/tools.nix { };
       systemd-boot = target.config.system.build.glfSystemdBoot;
@@ -45,7 +47,7 @@
     };
     vm = pkgs.mkShell {
       packages = with pkgs; [ python3 qemu_test python3Packages.virt-firmware
-        openssl sbsigntool cpio gzip zstd dosfstools mtools coreutils ];
+        openssl sbsigntool cpio gzip zstd dosfstools mtools coreutils kmod ];
       GLF_VM_MODULES = "${target.config.system.modulesTree}";
       GLF_VM_FIRMWARE = "${pkgs.OVMFFull.fd}/FV";
       GLF_VM_BUSYBOX = "${pkgs.pkgsStatic.busybox}/bin/busybox";
