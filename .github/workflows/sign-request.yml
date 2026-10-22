@@ -15,6 +15,10 @@ permissions:
   contents: read
 jobs:
   validate:
+    # GitHub exige le droit push pour lire les releases en brouillon.
+    # Ce job ne recoit aucun secret de signature.
+    permissions:
+      contents: write
     if: >-
       github.ref_type == 'branch' && github.ref_protected &&
       vars.GLF_SIGNING_ENABLED == 'true'
