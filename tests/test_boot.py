@@ -1,7 +1,4 @@
-"""Real PE signatures and UKI assembly, with a local disposable signing fixture.
-
-No production key, GitHub call, mounted ESP or firmware variable is used.
-"""
+"""Signatures reelles avec cle jetable ; aucune ecriture EFI sur l'hote."""
 import hashlib
 import json
 import os
@@ -12,103 +9,86 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pkgs" / "boot-tools" / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'pkgs/boot-tools/src'))
 from install_boot import install
-from signing_protocol import IMAGES, prepare, validate, verify_response
 
 
 class BootTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.tmp = tempfile.TemporaryDirectory(prefix="glf-secureboot-test-")
-        cls.root = Path(cls.tmp.name)
-        cls.key = cls.root / "key.pem"
-        cls.cert = cls.root / "cert.pem"
-        subprocess.run(["openssl", "req", "-newkey", "rsa:2048", "-nodes", "-x509", "-days", "1",
-                        "-subj", "/CN=GLF DISPOSABLE TEST/", "-keyout", str(cls.key), "-out", str(cls.cert)],
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='glf-split-test-')
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.key, self.cert = self.root / 'key.pem', self.root / 'cert.pem'
+        subprocess.run(['openssl', 'req', '-newkey', 'rsa:2048', '-nodes', '-x509', '-days', '1',
+                        '-subj', '/CN=GLF DISPOSABLE TEST/', '-keyout', str(self.key), '-out', str(self.cert)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        cls.signer = cls.root / "signer"
-        cls.signer.write_text(f'''#!{sys.executable}
-import pathlib, subprocess, sys
-source, dest = map(pathlib.Path, sys.argv[-2:])
-dest.mkdir()
-for name in {IMAGES!r}:
-    subprocess.run(['sbsign', '--key', {str(cls.key)!r}, '--cert', {str(cls.cert)!r}, '--output', str(dest/name), str(source/name)], check=True)
-''')
-        cls.signer.chmod(0o700)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.tmp.cleanup()
+        self.bundle = self.root / 'bundle'
+        self.bundle.mkdir()
+        for name, source in [('kernel.efi', 'GLF_TEST_STUB'), ('systemd-bootx64.efi', 'GLF_TEST_BOOT')]:
+            subprocess.run(['sbsign', '--key', str(self.key), '--cert', str(self.cert),
+                            '--output', str(self.bundle / name), os.environ[source]], check=True)
+        for name in ('shimx64.efi', 'mmx64.efi'):
+            shutil.copyfile(Path(os.environ['GLF_TEST_SHIM']) / name, self.bundle / name)
+        self.esp = self.root / 'esp'
+        self.config = {'esp': str(self.esp), 'certificate': str(self.cert),
+                       'timeout': '5', 'canTouchEfiVariables': False}
 
     def target(self, name):
         target = self.root / name
         target.mkdir()
-        (target / "init").write_text("fixture")
-        (target / "etc").mkdir()
-        (target / "etc/os-release").write_text('ID=glf-test\nPRETTY_NAME="GLF TEST"\nVERSION_ID=1\n')
-        initrd = target / "initrd"
-        initrd.write_bytes(b"fixture initrd")
-        metadata = {
-            "version": 1, "kernel": os.environ["GLF_TEST_STUB"], "stub": os.environ["GLF_TEST_STUB"],
-            "initrd": str(initrd), "systemdBoot": os.environ["GLF_TEST_BOOT"],
-            "ukify": os.environ["GLF_TEST_UKIFY"], "kernelVersion": "test",
-            "kernelParams": ["root=LABEL=machine-specific", "lockdown=integrity", "module.sig_enforce=1"],
-        }
-        (target / "glf-secureboot.json").write_text(json.dumps(metadata))
+        (target / 'init').write_text('fixture')
+        (target / 'initrd').write_bytes(b'local initrd ' + name.encode())
+        (target / 'glf-secureboot.json').write_text(json.dumps({
+            'version': 2, 'signedBundle': str(self.bundle), 'kernel': os.environ['GLF_TEST_STUB'],
+            'initrd': str(target / 'initrd'),
+            'kernelParams': ['root=LABEL=machine-specific', 'lockdown=integrity', 'module.sig_enforce=1'],
+        }))
         return target
 
-    def config(self, name):
-        return {"esp": str(self.root / name), "certificate": str(self.cert),
-                "shim": os.environ["GLF_TEST_SHIM"], "signerCommand": [str(self.signer)],
-                "timeout": "5", "canTouchEfiVariables": False}
-
     def test_install_and_rollback(self):
-        config = self.config("esp")
-        first, second = self.target("first"), self.target("second")
-        install(config, first, allow_unmounted=True)
-        install(config, second, allow_unmounted=True)
-        esp = Path(config["esp"])
-        self.assertEqual(len(list((esp / "EFI/Linux").glob("glf-*.efi"))), 2)
-        self.assertEqual((esp / "EFI/BOOT/BOOTX64.EFI").read_bytes(), (Path(config["shim"]) / "shimx64.efi").read_bytes())
-        self.assertEqual((esp / "EFI/GLF/grubx64.efi").read_bytes(), (esp / "EFI/systemd/systemd-bootx64.efi").read_bytes())
-        install(config, first, allow_unmounted=True)
-        first_name = "glf-" + hashlib.sha256(str(first).encode()).hexdigest()[:32] + ".efi"
-        self.assertIn(first_name, (esp / "loader/loader.conf").read_text())
-        dumped = self.root / "cmdline"
-        subprocess.run(["objcopy", "--dump-section", f".cmdline={dumped}", str(esp / "EFI/Linux" / first_name), str(self.root / "copy.efi")], check=True)
-        self.assertIn(f"init={first}/init", dumped.read_text())
-        self.assertIn("root=LABEL=machine-specific", dumped.read_text())
+        first, second = self.target('first'), self.target('second')
+        for target in (first, second, first):
+            install(self.config, target, allow_unmounted=True)
+        identifier = hashlib.sha256(str(first).encode()).hexdigest()[:32]
+        entry = f'glf-{identifier}.conf'
+        self.assertEqual(len(list((self.esp / 'loader/entries').glob('*.conf'))), 2)
+        self.assertIn(entry, (self.esp / 'loader/loader.conf').read_text())
+        contents = (self.esp / 'loader/entries' / entry).read_text()
+        self.assertIn(f'init={first}/init', contents)
+        self.assertIn(f'initrd /EFI/GLF/generations/{identifier}/initrd', contents)
+        self.assertEqual((self.esp / f'EFI/GLF/generations/{identifier}/initrd').read_bytes(), (first / 'initrd').read_bytes())
+        self.assertEqual((self.esp / 'EFI/BOOT/BOOTX64.EFI').read_bytes(), (self.bundle / 'shimx64.efi').read_bytes())
+        self.assertEqual((self.esp / 'EFI/GLF/grubx64.efi').read_bytes(), (self.bundle / 'systemd-bootx64.efi').read_bytes())
 
-    def test_signing_failure_preserves_esp(self):
-        config = self.config("failure-esp")
-        esp = Path(config["esp"])
-        (esp / "loader").mkdir(parents=True)
-        (esp / "loader/loader.conf").write_text("old default")
-        config["signerCommand"] = ["/does-not-exist"]
-        with self.assertRaises(FileNotFoundError):
-            install(config, self.target("failure"), allow_unmounted=True)
-        self.assertEqual((esp / "loader/loader.conf").read_text(), "old default")
-        self.assertFalse((esp / "EFI").exists())
+    def test_invalid_signature_preserves_esp(self):
+        target = self.target('bad-signature')
+        (self.esp / 'loader').mkdir(parents=True)
+        (self.esp / 'loader/loader.conf').write_text('old default')
+        data = bytearray((self.bundle / 'kernel.efi').read_bytes())
+        data[0x20] ^= 1
+        (self.bundle / 'kernel.efi').write_bytes(data)
+        with self.assertRaises(subprocess.CalledProcessError):
+            install(self.config, target, allow_unmounted=True)
+        self.assertEqual((self.esp / 'loader/loader.conf').read_text(), 'old default')
+        self.assertFalse((self.esp / 'EFI').exists())
 
-    def test_protocol_and_payload(self):
-        unsigned, signed = self.root / "input", self.root / "signed"
-        unsigned.mkdir()
-        for name in IMAGES:
-            shutil.copyfile(os.environ["GLF_TEST_STUB"], unsigned / name)
-        expected = prepare(unsigned, "fixture")
-        validate(unsigned, expected)
-        with self.assertRaises(ValueError):
-            validate(unsigned, "0" * 64)
-        subprocess.run([str(self.signer), str(unsigned), str(signed)], check=True)
-        verify_response(unsigned, signed, self.cert)
-        # An authentic signature of a DIFFERENT payload must still be rejected.
-        shutil.copyfile(os.environ["GLF_TEST_BOOT"], unsigned / "kernel.efi")
-        with self.assertRaises(ValueError):
-            verify_response(unsigned, signed, self.cert)
-        with self.assertRaises(ValueError):
-            validate(unsigned, expected)
+    def test_signed_wrong_kernel_rejected(self):
+        target = self.target('wrong-kernel')
+        shutil.copyfile(self.bundle / 'systemd-bootx64.efi', self.bundle / 'kernel.efi')
+        with self.assertRaisesRegex(ValueError, 'ne correspond pas'):
+            install(self.config, target, allow_unmounted=True)
+        self.assertFalse(self.esp.exists())
+
+    def test_parameter_injection_rejected(self):
+        target = self.target('bad-params')
+        meta = json.loads((target / 'glf-secureboot.json').read_text())
+        for param in ('root=x\nlinux /other.efi', 'module.sig_enforce=0', 'init=/other/init'):
+            altered = {**meta, 'kernelParams': meta['kernelParams'] + [param]}
+            (target / 'glf-secureboot.json').write_text(json.dumps(altered))
+            with self.assertRaises(ValueError):
+                install(self.config, target, allow_unmounted=True)
+            self.assertFalse(self.esp.exists())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

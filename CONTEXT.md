@@ -127,3 +127,119 @@ L’utilisateur a explicitement autorisé contents:write pour le seul job valida
 et la suppression de l’approbation manuelle du job sign. Conserver la restriction
 Rising, la protection de branche et la vérification des images. Le bootstrap
 reste désactivé et sa revue manuelle distincte est conservée.
+
+## Cible sans UKI — décision et première validation
+
+L’utilisateur abandonne les UKI et les demandes de signature par poste :
+NIX_SB doit publier noyau et chargeur signés une fois par version, accompagnés
+du shim Rocky intact, de MokManager et du certificat public GLF. GLF-OS construit
+son initrd localement, sans jeton de signature. Initrd et paramètres ne sont pas
+authentifiés par cette chaîne. Aucun changement du dépôt GLF-OS autorisé.
+
+La première étape est validée : tests/test_uefi.py, GLF_VM_BOOT_MODE=split,
+GLF_VM_VARIANT=xonedo, démarre via shim Rocky et systemd-boot avec noyau signé
+et initrd séparé. Secure Boot=1, lockdown integrity, pilotes chargés, module
+altéré rejeté. GLF_VM_CORRUPT_KERNEL=1 confirme aussi le refus d’un noyau altéré
+(Security Violation, aucun démarrage Linux). Clé jetable et firmware de VM
+uniquement. Voir docs/VALIDATION.md.
+
+La CI, les paquets de publication signés et l’installateur restent à migrer.
+Le guide integration-glfos.md porte un avertissement : son ancien parcours
+UKI ne doit plus être intégré. Systemd-boot peut être conservé pour la suite.
+
+Pour mémoire, avant ce changement de cible, la signature automatique de production
+avait réussi dans le run 39766464511, avec récupération et vérification des trois
+images fictives. Ne pas confondre ce succès historique avec la future publication
+sans UKI, qui n’est pas encore implémentée.
+
+
+## Refonte centralisée autorisée et implémentée localement
+
+Après refus de l’auto-review, l’utilisateur a explicitement confirmé le
+remplacement complet du service par poste, suppressions incluses. Le workflow
+sign-request et le client github_sign sont retirés. Le workflow uki.yml conserve
+son chemin mais construit sans UKI, signe via glf-signing-production puis publie
+une release par branche/commit (draft jusqu’à la fin des uploads, pas de clobber).
+ci/package-release.sh produit l’archive et release.json (URL/hash Nix/commit/branche).
+
+API : argument racine signedReleaseFile facultatif, sb.signed=null sans lui ;
+sinon bundle/kernel/bootloader vérifiés dans pkgs/signed. Paquet public
+secureboot-certificate ajouté. Outils version 0.3.0, installateur sans réseau,
+métadonnées version 2 (signedBundle/kernel/initrd/kernelParams). Entrées type 1,
+conservation des générations, signatures et correspondance du noyau vérifiées.
+Guide integration-glfos.md réécrit et docs actives mises à jour.
+
+Tests réels locaux avec clé jetable : installation/rollback, refus signature
+altérée et mauvais noyau, contrôles paramètres, signature/archive, hash NAR,
+import réel fetchzip et construction du bundle Nix. Le test Nix utilise une copie
+isolée du paquet avec certificat jetable, jamais la clé/certificat de production.
+Reste : publication réelle après commit/PR/fusion, intégration GLF-OS et matériel.
+Aucune publication distante ni modification de GLF-OS pendant cette refonte.
+
+
+## Contrat GLF-OS précisé par l’utilisateur
+
+channels-glfos est l’autorité pour les pins nixpkgs et nixpkgs-unstable par version.
+GLF-OS ne doit PAS consommer la flake NIX_SB. La sous-flake modules/glf-apps
+référence ce dépôt comme source flake=false et fournit les paquets par callPackage
+via son overlay. Les exemples du guide ont été corrigés ; API racine déjà compatible.
+Lecture seule des copies locales GLF-CHANNELS et glf-os : structure confirmée,
+URL Git réelle utilisée localement :
+https://framagit.org/gaming-linux-fr/glf-os/channels-glfos/glf-os-channels.git
+L’URL groupe fournie n’est pas accessible via web ; pas de vérification distante.
+Aucun fichier GLF-OS/channels modifié. La flake interne NIX_SB conserve pour l’instant
+son ancien nixpkgs unstable : alignement CI sur le socle channels encore à réaliser,
+sans prétendre que les tests précédents démontrent sa compatibilité avec GLF-OS.
+
+
+## Responsabilité des mises à jour GLF-OS
+
+Correction explicite de l’utilisateur : glf-update est responsable des mises
+à jour, pas glf-boot. Le guide raccorde donc glf-secureboot-install au parcours
+de glf-update après construction de la génération cible. Aucun code GLF-OS modifié.
+
+
+## Alignement CI demandé, réalisé avec blocage de compatibilité découvert
+
+Le dépôt Git channels réel est accessible (l’URL groupe ne l’était pas).
+main distant = dc9d3bd4bf372fa8b0894bd565013aa0225eced0, identique au lock GLF-OS.
+La flake NIX_SB et son lock suivent désormais glf-channels/nixpkgs et unstable.
+Socle nixpkgs choisi conformément au module boot.nix GLF-OS (lecture seule).
+ci/channels.py vérifie follows/pins et permet la comparaison avec un lock GLF-OS.
+ci/build.sh trace channels et les deux pins dans le manifeste de publication.
+
+ATTENTION : nix flake check échoue désormais sur rebuildImage absent.
+Les deux pins channels (nixpkgs 26f4107e47e3ad0ffd0db220469ba83b6f6d96e8,
+unstable 55bfb4d7437bd4e09ab7cba58a43bd68eb310044) fournissent 6.18.56,
+aggregateModules présent mais rebuildImage absent. Ancien pin 02c087f fourni
+6.18.57 et rebuildImage. Aucun changement channels ni GLF-OS effectué.
+Choix nécessaire : mise à jour channels vers un pin compatible ou rétroportage
+réel du mécanisme (pas simple alias). Ne pas prétendre les tests antérieurs
+valident les pins alignés. Alignement lock vérifié, évaluation globale bloquée.
+
+
+## Deux canaux exigés : current et testing
+
+Correction utilisateur : glf-os-channels pour la version actuelle, testing-channels
+pour testing. Noms/URLs vérifiés via code GLF-OS en lecture seule et git ls-remote.
+La flake verrouille les deux dépôts ; testing-channels main = dbb24ffcb03dfd95d9474d76c953da0f0ec729e4.
+Son nixpkgs résout vers 02c087f (rebuildImage présent), unstable vers 9fbb54b.
+Les inputs testing peuvent suivre une branche : le lock fixe les commits résolus.
+Ne pas exiger que original.rev existe, ni confondre testing avec unstable current.
+
+Sorties internes préfixées testing- (packages/checks/devShells) en plus de current.
+CI uki.yml orchestre matrice current/testing fail-fast=false via channel.yml,
+chaînes indépendantes et statut global validate exigeant les deux réussites.
+Artefacts, tags et descripteurs incluent le profil. GLF_CHANNEL choisit les sorties
+pour ci/build.sh et ci/check.sh. Le paquet signé vérifie aussi le profil du manifeste.
+Current reste bloqué par rebuildImage absent ; testing s’évalue correctement.
+Aucun GLF-OS ni channel modifié, aucune publication distante lancée.
+
+
+## Exception temporaire current explicitement autorisée
+
+L’utilisateur autorise la fusion et la publication testing uniquement, current
+explicitement indisponible et non bloquant. uki.yml appelle seulement testing ;
+current-unavailable affiche un avertissement sans construire ni signer. Le statut
+validate exige le succès de testing : aucun échec testing n’est ignoré. Aucune
+protection de branche ou restriction de secrets n’est supprimée.

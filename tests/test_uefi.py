@@ -16,6 +16,12 @@ def run(*args, **kw):
 
 
 kernel = Path(sys.argv[1]).resolve(strict=True)
+boot_mode = os.environ.get("GLF_VM_BOOT_MODE", "uki")
+if boot_mode not in ("uki", "split"):
+    raise ValueError("GLF_VM_BOOT_MODE: uki ou split attendu")
+reject_kernel = os.environ.get("GLF_VM_CORRUPT_KERNEL", "0") == "1"
+if reject_kernel and boot_mode != "split":
+    raise ValueError("GLF_VM_CORRUPT_KERNEL exige le mode split")
 variant = os.environ.get("GLF_VM_VARIANT", "catalogue")
 if variant not in ("catalogue", "xone", "xonedo"):
     raise ValueError("GLF_VM_VARIANT: catalogue, xone ou xonedo attendu")
@@ -103,17 +109,38 @@ poweroff -f
     (esp / "EFI/BOOT").mkdir(parents=True)
     (esp / "EFI/Linux").mkdir()
     (esp / "loader").mkdir()
-    (esp / "loader/loader.conf").write_text("default glf-test.efi\ntimeout 0\neditor no\n")
+    entry = "glf-test.conf" if boot_mode == "split" else "glf-test.efi"
+    (esp / "loader/loader.conf").write_text(f"default {entry}\ntimeout 0\neditor no\n")
     shutil.copyfile(Path(os.environ["GLF_TEST_SHIM"]) / "shimx64.efi", esp / "EFI/BOOT/BOOTX64.EFI")
     shutil.copyfile(Path(os.environ["GLF_TEST_SHIM"]) / "mmx64.efi", esp / "EFI/BOOT/mmx64.efi")
     run("sbsign", "--key", key, "--cert", cert, "--output", esp / "EFI/BOOT/grubx64.efi", os.environ["GLF_TEST_BOOT"])
-    osrelease = root / "os-release"
-    osrelease.write_text('ID=glf-test\nPRETTY_NAME="GLF VM TEST"\nVERSION_ID=1\n')
-    uki = root / "unsigned.efi"
-    run(os.environ["GLF_TEST_UKIFY"], "build", "--linux", kernel, "--initrd", initrd,
-        "--stub", os.environ["GLF_TEST_STUB"], "--os-release", "@" + str(osrelease),
-        "--cmdline", "console=ttyS0 rdinit=/init module.sig_enforce=1 lockdown=integrity", "--output", uki)
-    run("sbsign", "--key", key, "--cert", cert, "--output", esp / "EFI/Linux/glf-test.efi", uki)
+    cmdline = "console=ttyS0 rdinit=/init module.sig_enforce=1 lockdown=integrity"
+    if boot_mode == "split":
+        (esp / "EFI/GLF").mkdir()
+        (esp / "loader/entries").mkdir()
+        run("sbsign", "--key", key, "--cert", cert,
+            "--output", esp / "EFI/GLF/kernel.efi", kernel)
+        if reject_kernel:
+            signed_kernel = esp / "EFI/GLF/kernel.efi"
+            data = bytearray(signed_kernel.read_bytes())
+            # Reserved DOS-header byte, covered by Authenticode, outside EFI code.
+            data[0x20] ^= 1
+            signed_kernel.write_bytes(data)
+            verification = subprocess.run(["sbverify", "--cert", str(cert), str(signed_kernel)],
+                                          capture_output=True)
+            assert verification.returncode != 0, "La signature alteree est encore valide"
+        shutil.copyfile(initrd, esp / "EFI/GLF/initrd")
+        (esp / "loader/entries/glf-test.conf").write_text(
+            "title GLF separate initrd test\nlinux /EFI/GLF/kernel.efi\n"
+            "initrd /EFI/GLF/initrd\noptions " + cmdline + "\n")
+    else:
+        osrelease = root / "os-release"
+        osrelease.write_text('ID=glf-test\nPRETTY_NAME="GLF VM TEST"\nVERSION_ID=1\n')
+        uki = root / "unsigned.efi"
+        run(os.environ["GLF_TEST_UKIFY"], "build", "--linux", kernel, "--initrd", initrd,
+            "--stub", os.environ["GLF_TEST_STUB"], "--os-release", "@" + str(osrelease),
+            "--cmdline", cmdline, "--output", uki)
+        run("sbsign", "--key", key, "--cert", cert, "--output", esp / "EFI/Linux/glf-test.efi", uki)
     firmware = Path(os.environ["GLF_VM_FIRMWARE"])
     varstore = root / "vars.fd"
     run("virt-fw-vars", "--input", firmware / "OVMF_VARS.fd", "--output", varstore,
@@ -133,11 +160,22 @@ poweroff -f
                "-drive", f"format=raw,file={disk}", "-display", "none", "-serial", f"file:{log}",
                "-monitor", "none", "-nic", "none", "-no-reboot"]
     try:
-        run(*command, timeout=180)
+        run(*command, timeout=60 if reject_kernel else 180)
+    except subprocess.TimeoutExpired:
+        if not reject_kernel:
+            raise
     finally:
         text = log.read_text(errors="replace") if log.exists() else ""
         Path("dist").mkdir(exist_ok=True)
-        Path(f"dist/uefi-{variant}-serial.log").write_text(text)
+        suffix = "" if boot_mode == "uki" else "-split"
+        if reject_kernel:
+            suffix += "-rejected"
+        Path(f"dist/uefi-{variant}{suffix}-serial.log").write_text(text)
+    if reject_kernel:
+        assert "Linux version" not in text and "GLF_UEFI_BOOT_OK" not in text, "Noyau altere execute"
+        assert "Security Violation" in text, "Rejet Secure Boot non observe dans le journal"
+        print("OK : noyau altere refuse par la chaine shim / systemd-boot (Security Violation).")
+        sys.exit(0)
     assert "GLF_UEFI_BOOT_OK" in text, "Le noyau n'a pas atteint /init : voir dist/uefi-<variante>-serial.log"
     assert "[integrity]" in text, "Lockdown integrity absent"
     for driver in drivers:
@@ -146,4 +184,5 @@ poweroff -f
     assert "Key was rejected" in text, "Rejet de signature non confirme"
     secure_line = next(line for line in text.splitlines() if "GLF_SECURE_BOOT=" in line)
     assert secure_line.split("=")[-1].strip() == "1", "Secure Boot non actif"
-    print("OK : UEFI Secure Boot -> shim Rocky -> systemd-boot signe MOK -> UKI -> noyau, lockdown integrity actif.")
+    payload = "noyau signe + initrd separe" if boot_mode == "split" else "UKI -> noyau"
+    print(f"OK : UEFI Secure Boot -> shim Rocky -> systemd-boot signe MOK -> {payload}, lockdown integrity actif.")

@@ -1,9 +1,19 @@
 {
   description = "NIX_SB : paquets noyau de confiance, drivers et outils Secure Boot";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    # Rising utilise le meme channel que GLF-OS ; le lock fixe son commit.
+    glf-channels.url = "git+https://framagit.org/gaming-linux-fr/glf-os/channels-glfos/glf-os-channels.git?ref=main";
+    testing-channels.url = "git+https://framagit.org/gaming-linux-fr/glf-os/channels-glfos/testing-channels.git?ref=main";
+    testing-nixpkgs.follows = "testing-channels/nixpkgs";
+    testing-nixpkgs-unstable.follows = "testing-channels/nixpkgs-unstable";
+    nixpkgs.follows = "glf-channels/nixpkgs";
+    nixpkgs-unstable.follows = "glf-channels/nixpkgs-unstable";
+  };
 
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, testing-nixpkgs, ... }:
+    let
+      forChannel = nixpkgs:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -22,6 +32,7 @@
         approvedModules = builtins.removeAttrs sb.drivers [ excluded ];
       };
       testEnvironment = {
+        GLF_TEST_NIXPKGS = nixpkgs.outPath;
         GLF_TEST_BOOT = "${pkgs.systemd}/lib/systemd/boot/efi/systemd-bootx64.efi";
         GLF_TEST_STUB = "${pkgs.systemd}/lib/systemd/boot/efi/linuxx64.efi.stub";
         GLF_TEST_UKIFY = "${pkgs.systemdUkify}/lib/systemd/ukify";
@@ -30,7 +41,7 @@
     in {
       legacyPackages.${system} = sb;
       packages.${system} = {
-        inherit (sb) kernel certificates boot-tools rocky-shim nvidia;
+        inherit (sb) kernel certificates boot-tools rocky-shim secureboot-certificate nvidia;
         base-kernel = sb.kernelPackages.kernel;
         modules-tree = sb.modulesTree;
         default = sb.kernel;
@@ -57,5 +68,18 @@
           GLF_VM_BUSYBOX = "${pkgs.pkgsStatic.busybox}/bin/busybox";
         });
       };
+    };
+      current = forChannel nixpkgs;
+      testing = forChannel testing-nixpkgs;
+      system = "x86_64-linux";
+      prefix = attrs: builtins.listToAttrs (map (name: {
+        name = "testing-${name}"; value = attrs.${name};
+      }) (builtins.attrNames attrs));
+    in current // {
+      packages.${system} = current.packages.${system} // prefix testing.packages.${system};
+      checks.${system} = current.checks.${system} // prefix testing.checks.${system};
+      devShells.${system} = current.devShells.${system} // prefix testing.devShells.${system};
+      legacyPackages.${system} = current.legacyPackages.${system} // { testing = testing.legacyPackages.${system}; };
+      nixosConfigurations = current.nixosConfigurations // { testing-prototype = testing.nixosConfigurations.prototype; };
     };
 }

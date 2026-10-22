@@ -1,7 +1,9 @@
 # Architecture
 
 NIX_SB contient des paquets, sans dépendance vers le code GLF-OS. Le choix de `kernelPackages` est centralisé dans `kernel.json`, avec une
-révision nixpkgs verrouillée par ce dépôt. Le consommateur reprend cet ensemble.
+révision nixpkgs choisie par les channels GLF-OS. La CI doit reprendre cet ensemble.
+GLF-OS référence les sources dans glf-apps (flake = false) et appelle les paquets
+via callPackage ; la flake interne NIX_SB n’est pas son interface.
 
 ```text
 kernelPackages.kernel + drivers du catalogue
@@ -12,8 +14,8 @@ kernelPackages.kernel + drivers du catalogue
 ```
 
 `pkgs/kernel` produit une image (`bzImage` sur x86_64), pas un nouveau
-`kernelPackages`. Les modules et l’initrd utilisent le noyau de base ; l’UKI
-référence l’image enrichie. Recompiler les drivers contre cette image créerait
+`kernelPackages`. Les modules et l’initrd utilisent le noyau de base ; la CI
+signe l’image enrichie. Recompiler les drivers contre cette image créerait
 une dépendance circulaire. Le noyau de base doit réserver l’espace nécessaire
 aux certificats selon le mécanisme kmodigest de nixpkgs.
 
@@ -26,12 +28,13 @@ Le bundle et l’image reçoivent le même arbre via `default.nix`. Chaque paque
 est aussi importable individuellement ; dans ce cas le consommateur doit
 fournir les mêmes `kernelPackages` et `approvedModules` aux deux paquets.
 
-La chaîne de démarrage cible reste UEFI → shim Rocky → systemd-boot signé → UKI
-signée. La confiance EFI et la confiance dans les modules sont distinctes.
+La chaîne de démarrage cible est UEFI → shim Rocky → systemd-boot signé → noyau
+signé avec initrd séparé. La confiance EFI et la confiance dans les modules sont distinctes.
 Les paramètres `module.sig_enforce=1` et `lockdown=integrity` doivent être
-présents dans l’UKI signée. Le signataire doit contrôler les composants approuvés ;
+présents dans l’entrée de démarrage locale, qui n’est pas signée. Le signataire doit contrôler les composants approuvés ;
 un catalogue local arbitraire ne constitue pas une autorisation de signature.
 
 Les certificats du noyau sont générés par les builds. La clé privée EFI reste
-extérieure aux paquets et au store Nix. Le provisionnement et le transport de
-signature sont fournis par les workflows et le client de ce dépôt.
+extérieure aux paquets et au store Nix. Le provisionnement et la publication des
+composants signés sont fournis par les workflows de ce dépôt. Aucun client de
+signature n’est distribué aux postes. Voir integration-glfos.md à la racine.

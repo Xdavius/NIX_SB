@@ -1,48 +1,37 @@
-name: GLF kernel and UKI
-
+name: GLF kernel and signed boot
 on:
   pull_request:
   push:
     branches: ["**"]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: uki-${{ github.workflow }}-${{ github.ref }}
+  group: secureboot-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
+  current-unavailable:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Signaler current indisponible
+        run: |
+          echo "::warning::Canal current indisponible : rebuildImage absent. Aucune construction, signature ou publication current."
+          echo "### Current : indisponible" >> "$GITHUB_STEP_SUMMARY"
+          echo "Exception temporaire autorisee : seule la reussite de testing conditionne la fusion. Aucun artefact current n'est publie." >> "$GITHUB_STEP_SUMMARY"
+  testing:
+    # Le workflow appele restreint ce droit au seul job de publication.
+    permissions:
+      contents: write
+    uses: ./.github/workflows/channel.yml
+    with:
+      profile: testing
+    secrets: inherit
   validate:
+    if: always()
+    needs: testing
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
-      - run: nix develop --no-update-lock-file .#ci --command bash ci/check.sh
-
-  build:
-    if: github.event_name != 'pull_request'
-    needs: validate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
-      - run: bash ci/build.sh
-      - name: Identifier la version GLF-OS
-        id: version
+      - name: Verifier le canal testing obligatoire
         env:
-          VERSION_BRANCH: ${{ github.ref_name }}
-        run: echo "name=${VERSION_BRANCH//\//-}" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: unsigned-${{ steps.version.outputs.name }}-${{ github.sha }}
-          path: dist/unsigned/
-          if-no-files-found: error
-          retention-days: 7
+          RESULT: ${{ needs.testing.result }}
+        run: test "$RESULT" = success

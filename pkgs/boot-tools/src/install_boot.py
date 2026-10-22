@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install a verified shim -> systemd-boot -> machine-specific UKI generation."""
+"""Install a verified shim -> systemd-boot -> signed kernel with a separate local initrd."""
 import argparse
 import fcntl
 import hashlib
@@ -33,22 +33,42 @@ def atomic_copy(source, destination):
             os.unlink(tmp)
 
 
-def signer_command(config):
-    signer = config.get("signerCommand")
-    if (not isinstance(signer, list) or not signer
-            or not all(isinstance(arg, str) and arg for arg in signer)):
-        raise ValueError("signerCommand doit etre une liste non vide de chaines")
-    return signer
-
-
 def install(config, target, allow_unmounted=False):
-    signer = signer_command(config)
+    if "signerCommand" in config:
+        raise ValueError("signerCommand retire : fournir signedBundle dans les metadonnees v2")
     target = Path(target).resolve(strict=True)
     if not (target / "init").is_file():
         raise ValueError("Generation NixOS sans init")
     metadata = json.loads((target / "glf-secureboot.json").read_text())
-    if metadata.get("version") != 1:
-        raise ValueError("Generation incompatible avec le chargeur GLF")
+    if metadata.get("version") != 2:
+        raise ValueError("Metadonnees v2 requises : noyau signe et initrd separe")
+    bundle = Path(metadata["signedBundle"])
+    params = metadata["kernelParams"]
+    if (not isinstance(params, list) or
+            not all(isinstance(p, str) and p and not any(c in p for c in "\n\r\0") for p in params)):
+        raise ValueError("Parametres noyau invalides")
+    import shlex
+    tokens = shlex.split(" ".join(params))
+    for key, expected in (("module.sig_enforce", "1"), ("lockdown", "integrity")):
+        matches = [p for p in tokens if p.split("=", 1)[0].replace("-", "_") == key.replace("-", "_")]
+        if matches != [f"{key}={expected}"] or "--" in tokens:
+            raise ValueError("Politique noyau invalide : " + key)
+    if any(p.split("=", 1)[0] == "init" for p in tokens):
+        raise ValueError("init est fourni par l'installateur")
+    timeout = str(config["timeout"])
+    if not timeout.isdecimal():
+        raise ValueError("timeout doit etre un entier positif ou nul")
+    # No network or signing operation: only already-published components.
+    for name in ("kernel.efi", "systemd-bootx64.efi"):
+        run("sbverify", "--cert", config["certificate"], bundle / name)
+    if pe_content(metadata["kernel"]) != pe_content(bundle / "kernel.efi"):
+        raise ValueError("Le noyau signe ne correspond pas a cette generation")
+    initrd = Path(metadata["initrd"])
+    if not initrd.is_file():
+        raise ValueError("Initrd local absent")
+    for name in ("shimx64.efi", "mmx64.efi"):
+        if not (bundle / name).is_file():
+            raise ValueError("Publication incomplete : " + name)
     esp = Path(config["esp"])
     if not allow_unmounted:
         info = json.loads(subprocess.check_output(
@@ -57,46 +77,33 @@ def install(config, target, allow_unmounted=False):
             raise ValueError("L'ESP doit etre une partition FAT montee")
     esp.mkdir(parents=True, exist_ok=True)
     identifier = hashlib.sha256(str(target).encode()).hexdigest()[:32]
-    filename = f"glf-{identifier}.efi"
-    # Lock serializes installations across signing waits; lock remains on the ESP.
+    entry = f"glf-{identifier}.conf"
+    directory = f"EFI/GLF/generations/{identifier}"
     with open(esp / ".glf-install.lock", "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         with tempfile.TemporaryDirectory(prefix="glf-install-") as temporary:
             work = Path(temporary)
-            unsigned, signed = work / "unsigned", work / "signed"
-            unsigned.mkdir()
-            shutil.copyfile(metadata["kernel"], unsigned / "kernel.efi")
-            shutil.copyfile(metadata["systemdBoot"], unsigned / "systemd-bootx64.efi")
-            cmdline = " ".join([f"init={target}/init", *metadata["kernelParams"]])
-            run(metadata["ukify"], "build", "--linux", metadata["kernel"],
-                "--initrd", metadata["initrd"], "--stub", metadata["stub"],
-                "--cmdline", cmdline, "--os-release", f"@{target}/etc/os-release",
-                "--uname", metadata["kernelVersion"], "--output", unsigned / "glf-os.efi")
-            # Le transport de signature est fourni par le consommateur.
-            run(*signer, "--certificate", config["certificate"],
-                "--system", str(target), unsigned, signed)
-            # Verify again at the deployment boundary, even if the client already did.
-            for name in ("kernel.efi", "glf-os.efi", "systemd-bootx64.efi"):
-                run("sbverify", "--cert", config["certificate"], signed / name)
-                if pe_content(unsigned / name) != pe_content(signed / name):
-                    raise ValueError("Le signataire a modifie le contenu de " + name)
-            shim = Path(config["shim"])
-            # Stage/verify everything above BEFORE modifying bootable files.
-            atomic_copy(signed / "glf-os.efi", esp / "EFI/Linux" / filename)
-            for directory, shim_name in (("EFI/GLF", "shimx64.efi"), ("EFI/BOOT", "BOOTX64.EFI")):
-                atomic_copy(shim / "mmx64.efi", esp / directory / "mmx64.efi")
-                atomic_copy(signed / "systemd-bootx64.efi", esp / directory / "grubx64.efi")
-                atomic_copy(shim / "shimx64.efi", esp / directory / shim_name)
-            atomic_copy(signed / "systemd-bootx64.efi", esp / "EFI/systemd/systemd-bootx64.efi")
+            atomic_copy(bundle / "kernel.efi", esp / directory / "kernel.efi")
+            atomic_copy(initrd, esp / directory / "initrd")
+            for bootdir, shim_name in (("EFI/GLF", "shimx64.efi"), ("EFI/BOOT", "BOOTX64.EFI")):
+                atomic_copy(bundle / "mmx64.efi", esp / bootdir / "mmx64.efi")
+                atomic_copy(bundle / "systemd-bootx64.efi", esp / bootdir / "grubx64.efi")
+                atomic_copy(bundle / "shimx64.efi", esp / bootdir / shim_name)
+            atomic_copy(bundle / "systemd-bootx64.efi", esp / "EFI/systemd/systemd-bootx64.efi")
             atomic_copy(config["certificate"], esp / "EFI/GLF/GLF.pem")
-            loader = work / "loader.conf"
-            loader.write_text(f"default {filename}\ntimeout {config['timeout']}\neditor no\nauto-entries yes\nsecure-boot-enroll off\n")
-            atomic_copy(loader, esp / "loader/loader.conf")
-            # Record the exact generation for diagnostics and retention; never prune
-            # someone else's entries or pre-existing OS files.
+            cmdline = " ".join([f"init={target}/init", *params])
+            boot_entry = work / "entry.conf"
+            boot_entry.write_text(f"title GLF-OS {identifier}\nlinux /{directory}/kernel.efi\n"
+                                  f"initrd /{directory}/initrd\noptions {cmdline}\n")
+            atomic_copy(boot_entry, esp / "loader/entries" / entry)
             record = work / "generation.json"
-            record.write_text(json.dumps({"system": str(target), "sha256": digest(signed / "glf-os.efi")}))
-            atomic_copy(record, esp / "EFI/GLF/generations" / (filename + ".json"))
+            record.write_text(json.dumps({"system": str(target), "bundle": str(bundle),
+                                          "kernelSha256": digest(bundle / "kernel.efi"),
+                                          "initrdSha256": digest(initrd)}))
+            atomic_copy(record, esp / directory / "generation.json")
+            loader = work / "loader.conf"
+            loader.write_text(f"default {entry}\ntimeout {timeout}\neditor no\nauto-entries yes\nsecure-boot-enroll off\n")
+            atomic_copy(loader, esp / "loader/loader.conf")
             if config["canTouchEfiVariables"]:
                 source = subprocess.check_output(["findmnt", "-n", "-o", "SOURCE", "--mountpoint", str(esp)], text=True).strip()
                 block = json.loads(subprocess.check_output(["lsblk", "--json", "--output", "PKNAME,PARTN", source], text=True))["blockdevices"][0]
@@ -106,9 +113,8 @@ def install(config, target, allow_unmounted=False):
                 if "\\EFI\\GLF\\shimx64.efi".lower() not in entries.lower():
                     run("efibootmgr", "--create", "--disk", "/dev/" + block["pkname"], "--part", str(block["partn"]),
                         "--label", "GLF-OS shim", "--loader", "\\EFI\\GLF\\shimx64.efi")
-                run("bootctl", "--esp-path=" + str(esp), "set-default", filename)
-            # Old UKIs remain available for rollback; no automatic deletion here.
-            print(f"Generation installee : {filename}. Chaine : shim Rocky -> systemd-boot -> UKI.")
+                run("bootctl", "--esp-path=" + str(esp), "set-default", entry)
+            print(f"Generation installee : {entry}. Noyau signe et initrd local separe.")
 
 
 def main():
