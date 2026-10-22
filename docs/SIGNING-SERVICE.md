@@ -60,7 +60,7 @@ variable d’empreinte `GLF_CERT_SHA256`. Il publie uniquement les images signé
 le certificat public et le manifeste. Les secrets ne sont pas accessibles au
 job de build. Le consommateur doit utiliser le même nixpkgs, noyau et catalogue.
 
-Configurer `glf-signing-production` avec approbateurs et accès limité aux branches de version protégées.
+Configurer `glf-signing-production` sans approbation manuelle, avec accès limité à Rising et contrôle de branche protégée dans le workflow.
 Le client nécessite un jeton capable de créer des draft releases, déclencher
 les workflows et télécharger leurs artefacts. Les postes ne reçoivent jamais
 le jeton d’administration des secrets ni la clé de signature.
@@ -71,8 +71,8 @@ secret d’initrd ne doit être envoyé. Les drafts sont conservées pour audit.
 ## Création unique de la clé
 
 Le workflow manuel `bootstrap-key.yml` est également limité aux branches protégées.
-Créer au préalable les environnements `glf-signing-production` et `glf-key-bootstrap`, avec
-approbation obligatoire et restriction aux branches de version approuvées. Dans `glf-key-bootstrap`,
+Créer les environnements `glf-signing-production` et `glf-key-bootstrap` avec restriction
+aux branches approuvées. Seul le bootstrap conserve une approbation obligatoire. Dans `glf-key-bootstrap`,
 fournir `GLF_KEY_ADMIN_TOKEN`, jeton limité à ce dépôt autorisant la lecture et
 l’écriture des secrets et variables d’environnement. `GITHUB_TOKEN` ne suffit pas.
 Activer temporairement la variable de dépôt `GLF_KEY_BOOTSTRAP_ENABLED=true`.
@@ -160,3 +160,14 @@ fichiers à une révision approuvée, pas le certificat GLF-TEST.
 La signature de production n’a pas encore été activée ni testée de bout en bout.
 Le bootstrap est refermé et son secret de jeton temporaire supprimé ; le
 propriétaire doit également révoquer ce jeton dans ses paramètres personnels GitHub.
+
+Le job de validation a `contents: write` : GitHub réserve la lecture des releases
+en brouillon aux identités disposant du droit d’écriture. Ce droit est limité au
+job sans clé ; le job de signature conserve `contents: read`.
+
+## Signature automatique autorisée
+
+L’utilisateur a autorisé la signature sans revue manuelle de chaque demande.
+L’environnement de production reste limité à Rising, le workflow exige une
+branche protégée et la validation réussie des composants avant accès à la clé.
+Le bootstrap reste désactivé et conserve son approbation distincte.

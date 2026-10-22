@@ -116,3 +116,14 @@ GLF_KEY_BOOTSTRAP_ENABLED remis à false ; secret temporaire GLF_KEY_ADMIN_TOKEN
 retiré du bootstrap. Révoquer aussi le jeton personnel côté compte GitHub.
 La signature de production reste désactivée jusqu’à sa validation dédiée ;
 aucune signature de poste réel ni modification GLF-OS effectuée.
+
+Test réel de signature autorisé avec publication des images fictives : run
+39765656321 arrêté avant signature, release draft invisible au GITHUB_TOKEN
+contents:read. Correctif : contents:write seulement sur le job de validation.
+La signature a été redésactivée après le lancement du test. Aucune clé utilisée
+par le run échoué. Demande conservée : glf-sign-fdb06e4dec284dada8c7187fa57a5ca9.
+
+L’utilisateur a explicitement autorisé contents:write pour le seul job validate
+et la suppression de l’approbation manuelle du job sign. Conserver la restriction
+Rising, la protection de branche et la vérification des images. Le bootstrap
+reste désactivé et sa revue manuelle distincte est conservée.
