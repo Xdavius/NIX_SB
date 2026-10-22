@@ -1,0 +1,104 @@
+name: Build one GLF channel
+on:
+  workflow_call:
+    inputs:
+      profile:
+        type: string
+        required: true
+permissions:
+  contents: read
+env:
+  GLF_CHANNEL: ${{ inputs.profile }}
+  GLF_SHELL: ${{ inputs.profile == 'testing' && 'testing-ci' || 'ci' }}
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - run: nix develop --no-update-lock-file .#"$GLF_SHELL" --command bash ci/check.sh
+
+  build:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - run: bash ci/build.sh
+      - name: Identifier la version GLF-OS
+        id: version
+        env:
+          VERSION_BRANCH: ${{ github.ref_name }}
+        run: echo "name=${VERSION_BRANCH//\//-}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: unsigned-${{ inputs.profile }}-${{ steps.version.outputs.name }}-${{ github.sha }}
+          path: dist/unsigned/
+          if-no-files-found: error
+          retention-days: 7
+
+  sign:
+    needs: build
+    if: >-
+      github.ref_type == 'branch' && github.ref_protected &&
+      vars.GLF_SIGNING_ENABLED == 'true'
+    environment: glf-signing-production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - name: Identifier la version GLF-OS
+        id: version
+        env:
+          VERSION_BRANCH: ${{ github.ref_name }}
+        run: echo "name=${VERSION_BRANCH//\//-}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: unsigned-${{ inputs.profile }}-${{ steps.version.outputs.name }}-${{ github.sha }}
+          path: dist/unsigned/
+      - name: Preparer les outils sans secrets
+        run: nix print-dev-env --no-update-lock-file .#"$GLF_SHELL" > /tmp/glf-sign-tools.sh
+      - name: Signer les composants de cette revision
+        env:
+          GLF_SIGNING_KEY_PEM: ${{ secrets.GLF_SIGNING_KEY_PEM }}
+          GLF_SIGNING_CERT_PEM: ${{ secrets.GLF_SIGNING_CERT_PEM }}
+          GLF_CERT_SHA256: ${{ vars.GLF_CERT_SHA256 }}
+        run: |
+          source /tmp/glf-sign-tools.sh
+          bash ci/sign.sh
+      - name: Preparer la publication Nix
+        run: nix develop --no-update-lock-file .#"$GLF_SHELL" --command bash ci/package-release.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: signed-${{ inputs.profile }}-${{ github.sha }}
+          path: dist/release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: sign
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-${{ inputs.profile }}-${{ github.sha }}
+          path: dist/release/
+      - name: Publier sans remplacer une version existante
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/publish-release.sh

@@ -1,62 +1,66 @@
-# Vérifications et builds
+# CI par branche et par canal GLF-OS
 
-## Contrôles légers par défaut
+Chaque branche de version (Rising actuellement) est traitée avec deux profils :
 
-`ci/check.sh` effectue les contrôles shell/YAML, l’évaluation de la flake avec
-`--no-build`, et les tests Python du catalogue, du contrat de commande, du client GitHub
-et des refus du bootstrap (sans génération de clé). Les assertions Nix testent les entrées invalides du catalogue,
-la sélection du noyau et les définitions locales des drivers GLF et la cohérence de l’image avec le bundle.
+| Profil | Dépôt channels | Sorties internes NIX_SB |
+| --- | --- | --- |
+| `current` | `glf-os-channels` | `kernel`, `ci`, `checks.…packages` |
+| `testing` | `testing-channels` | `testing-kernel`, `testing-ci`, `checks.…testing-packages` |
+
+Chaque dépôt channels fournit son propre couple `nixpkgs` / `nixpkgs-unstable`.
+Le socle noyau est le `nixpkgs` du profil. **Testing n’est pas l’entrée unstable
+du canal current.** Les deux sources et leurs pins sont enregistrés séparément
+dans `flake.lock` ; aucun rafraîchissement implicite n’a lieu pendant un build.
+
+`uki.yml` orchestre une matrice current/testing avec `fail-fast: false` et appelle
+`channel.yml`. Chaque appel possède sa propre chaîne validation → construction →
+signature → publication : un échec current n’empêche pas testing de progresser.
+Le statut global `validate` exige cependant la réussite des deux profils, afin
+de conserver un contrôle obligatoire sur les PR. Les PR ne construisent pas de
+noyau et ne signent ni ne publient.
+
+La signature exige une branche protégée autorisée dans l’environnement
+`glf-signing-production` et `GLF_SIGNING_ENABLED=true`. Cette restriction vaut
+pour les deux profils. Le job de publication a contents:write sans clé privée.
+Le shim Rocky est conservé intact ; seuls noyau et systemd-boot sont signés GLF.
+
+Les artefacts et releases portent le profil pour empêcher leur mélange :
+`secureboot-PROFIL-HASH_BRANCHE-COMMIT`. Le descripteur release.json contient
+`profile`, `branch`, `commit`, `url` et `hash`. Le manifeste build.json trace le
+dépôt channels, son commit et les pins nixpkgs/unstable. La release reste draft
+jusqu’à la fin des uploads. Aucun remplacement automatique d’une release existante.
+Les artefacts Actions expirent après sept jours, pas les assets de release.
+
+## Actualisation contrôlée des pins
 
 ```sh
-nix develop .#ci --command bash ci/check.sh
+nix flake update glf-channels testing-channels
+python3 ci/channels.py --profile current
+python3 ci/channels.py --profile testing
 ```
 
-Le shell peut télécharger ou construire ses outils, dont shim. Pour éviter
-cette réalisation, lancer directement les commandes légères du README avec
-les outils déjà installés. Les fichiers nouveaux non suivis par Git nécessitent
-la référence `path:$PWD` (ou `GLF_FLAKE_REF="path:$PWD"` pour le script).
+Les sources peuvent indiquer une branche mouvante : le lock NIX_SB enregistre
+le commit résolu. Conserver les mêmes pins dans les locks de consommation GLF-OS.
+`--glfos-lock /chemin/flake.lock` compare le profil sélectionné avec le couple
+résolu sous glf-channels du lock GLF-OS fourni (utiliser le checkout correspondant).
+La CI n’a pas besoin de modifier ou de cloner GLF-OS.
 
-## Opérations explicites, hors contrôles légers
+Contrôles séparés :
 
-`ci/build.sh` construit les sorties du présent dépôt (`GLF_FLAKE_REF` permet de
-choisir une référence). Il ne dépend plus d’une flake GLF-OS externe. Les images
-non signées et le manifeste sont placés dans `dist/unsigned/`.
-Le workflow GitHub lance ce build sur chaque push de branche et sur déclenchement
-manuel. Les pull requests effectuent uniquement les contrôles légers.
+```sh
+GLF_CHANNEL=current nix develop .#ci --command bash ci/check.sh
+GLF_CHANNEL=testing nix develop .#testing-ci --command bash ci/check.sh
+```
 
-Les tests `tests/test_boot.py` et `tests/test_signing_policy.py` utilisent de
-vraies images PE et les variables `GLF_TEST_*` fournies par le shell `ci`.
-`ci/test-signing.py "$GLF_TEST_STUB"` vérifie la signature avec une clé jetable.
-Le test `tests/test_uefi.py` nécessite un noyau construit et le shell `vm`.
-Ces tests ne sont pas lancés par `ci/check.sh`.
+## État des pins vérifiés
 
-Les tests et builds réussis avant la refonte ne valident pas les nouveaux
-chemins ni les drivers rapatriés. Un build et une validation Secure Boot seront
-nécessaires séparément avant déploiement.
+- current : channels `dc9d3bd`, nixpkgs `26f4107`, unstable `55bfb4d`.
+  Ces deux pins nixpkgs proposent 6.18.56 sans rebuildImage ; l’évaluation du
+  noyau enrichi échoue explicitement et sa publication reste bloquée.
+- testing : channels `dbb24ff`, nixpkgs résolu `02c087f`, unstable `9fbb54b`.
+  Le socle testing fournit 6.18.57 avec rebuildImage ; son contrat de paquets
+  s’évalue correctement.
 
-## Workflows de signature
-
-`sign-request.yml` valide les images contre les builds de ce dépôt puis les signe
-dans un job protégé séparé. `bootstrap-key.yml` crée la clé persistante une seule
-fois. Ces workflows sont manuels, désactivés tant que leurs variables ne sont pas
-activées, et ne sont pas exécutés par les contrôles légers. Voir SIGNING-SERVICE.md.
-
-La passe de validation réelle du 22 octobre 2026 est consignée dans
-[VALIDATION.md](VALIDATION.md), avec les commandes et les limites. Les scripts
-`test_certificates.py` et `test_real_images.py` vérifient les artefacts construits.
-Le test VM accepte `GLF_VM_VARIANT=xone` ou `xonedo` pour vérifier séparément les
-variantes contre le même noyau de confiance. Ces opérations restent explicites.
-
-## Une branche par version
-
-Chaque branche (initialement `Rising`) conserve son choix de noyau, son catalogue,
-sa version NVIDIA et son lock nixpkgs. La CI vérifie puis construit le commit poussé
-sur cette branche ; les exécutions de branches différentes sont indépendantes.
-Les artefacts sont nommés `unsigned-<branche>-<commit>` et contiennent `release.json`
-avec branche, commit, sélection noyau, version NVIDIA et révision nixpkgs.
-Les slashs du nom de branche sont remplacés par des tirets dans le nom d’artefact.
-
-Les artefacts Actions restent conservés sept jours et ne constituent pas un cache
-Nix permanent. Aucun transfert Attic ou publication de release automatique n’est
-configuré. Le futur consommateur GLF-OS doit épingler la branche de sa version.
-Les signatures de postes utilisent explicitement cette même branche protégée.
+Le canal actuel nécessite toujours une mise à jour compatible ou un rétroportage
+validé. Aucun repli silencieux sur testing. Aucune publication distante de cette
+nouvelle chaîne n’a encore été exécutée.

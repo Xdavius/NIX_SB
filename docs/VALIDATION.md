@@ -65,3 +65,71 @@ nix develop "path:$PWD#vm" --command env GLF_VM_VARIANT=xonedo \
 le store avaient conservé leur mode lecture seule. Les copies remplacent désormais
 le fichier de destination, ce qui permet de relancer le build/export. L’export a
 été relancé avec succès sur les anciens artefacts présents.
+
+## Demarrage sans UKI
+
+Le test `tests/test_uefi.py` accepte désormais `GLF_VM_BOOT_MODE=split`.
+Il utilise une entrée systemd-boot de type 1 (`linux`, `initrd`, `options`),
+un noyau EFI signé et un initrd séparé non signé. Shim Rocky et MokManager
+restent inchangés ; une clé jetable est inscrite dans MOK du firmware de la VM.
+Aucune clé de production ni variable EFI de l’hôte n’est utilisée.
+
+Test réalisé avec le noyau enrichi 6.18.57 et la variante xonedo :
+
+- Secure Boot actif (`GLF_SECURE_BOOT=1`) et lockdown `integrity` actif.
+- Démarrage jusqu’à `/init` depuis l’initrd séparé.
+- Chargement de Fanatec, new-lg4ff, hid-tmff2, xpadneo, v4l2loopback,
+  xone_dongle et xone_gip_gamepad (les deux derniers fournis par xonedo).
+- Module efivarfs altéré refusé pour signature invalide.
+
+```sh
+nix develop "path:$PWD#vm" --no-update-lock-file --command env \
+  GLF_VM_BOOT_MODE=split GLF_VM_VARIANT=xonedo \
+  python3 tests/test_uefi.py result-validation/bzImage
+```
+
+Journal : `dist/uefi-xonedo-split-serial.log` (non versionné).
+Ce test valide le maintien de systemd-boot dans la chaîne sans UKI ; il ne
+valide pas une installation GLF-OS complète ni un firmware physique.
+L’initrd et les paramètres de démarrage restent non authentifiés dans ce mode.
+La refonte décrite ci-dessous remplace ensuite la CI et l’installateur UKI.
+
+Le contre-test avec `GLF_VM_CORRUPT_KERNEL=1` a également réussi : après
+signature, un octet réservé de l’en-tête DOS du noyau est altéré, sans toucher
+au code EFI. `sbverify` constate la signature invalide ; la VM affiche
+`Security Violation` et n’exécute pas le noyau. Le délai de 60 secondes termine
+l’attente du menu après rejet ; un simple délai sans message de rejet ne suffit
+pas à faire réussir le test.
+
+```sh
+nix develop "path:$PWD#vm" --no-update-lock-file --command env \
+  GLF_VM_BOOT_MODE=split GLF_VM_VARIANT=xonedo GLF_VM_CORRUPT_KERNEL=1 \
+  python3 tests/test_uefi.py result-validation/bzImage
+```
+
+Journal : `dist/uefi-xonedo-split-rejected-serial.log` (non versionné).
+
+
+## Publication centralisée et installateur v2
+
+Implémentation locale sans UKI : build → signature du noyau et du chargeur →
+archive et descripteur à hash fixe → release par branche/commit. Les originaux
+Rocky sont copiés sans modification. Le workflow de demandes par poste et son
+client sont retirés. Le bootstrap et les secrets de production sont inchangés.
+
+Validations locales effectuées avec une clé jetable :
+
+- Installation de deux générations en répertoire temporaire et retour à la première.
+- Rejet d’une signature altérée avant modification des fichiers de démarrage.
+- Rejet d’un noyau signé valide mais différent du noyau attendu.
+- Rejet d’injections dans les paramètres et d’une politique contradictoire.
+- Signature sans secrets, avec mauvaise empreinte, mauvaise clé ou contenu altéré refusée.
+- Archive sans UKI ; conservation exacte de shim/MokManager et hash Nix identique
+  après extraction.
+- Construction réelle du paquet `pkgs/signed` via fetchzip dans une fixture
+  isolée avec son certificat de test, puis vérification des signatures/contenus.
+
+`ci/check.sh` exécute ces tests sans construire de noyau ni lancer de VM.
+Aucune publication distante de cette nouvelle chaîne n’a encore été exécutée.
+Le test historique à trois images n’est pas présenté comme une validation de
+ce nouveau workflow. Le certificat de production n’a pas été modifié.
