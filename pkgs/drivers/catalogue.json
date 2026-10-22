@@ -1,0 +1,26 @@
+{
+  "hid-fanatecff": {
+    "path": "./hid-fanatecff"
+  },
+  "new-lg4ff": {
+    "path": "./new-lg4ff"
+  },
+  "xone": {
+    "package": "xone"
+  },
+  "xpadneo": {
+    "package": "xpadneo"
+  },
+  "hid-tmff2": {
+    "package": "hid-tmff2"
+  },
+  "v4l2loopback": {
+    "path": "./v4l2loopback"
+  },
+  "nvidia-open": {
+    "path": "./nvidia"
+  },
+  "xonedo": {
+    "path": "./xonedo"
+  }
+}

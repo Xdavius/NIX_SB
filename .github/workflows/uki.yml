@@ -3,7 +3,7 @@ name: GLF kernel and UKI
 on:
   pull_request:
   push:
-    branches: [main, master, develop]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:
@@ -23,15 +23,9 @@ jobs:
           persist-credentials: false
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
       - run: nix develop --no-update-lock-file .#ci --command bash ci/check.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: enrollment-x64-${{ github.sha }}
-          path: result-enrollment/
-          if-no-files-found: error
-          retention-days: 7
 
   build:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 360
@@ -41,9 +35,14 @@ jobs:
           persist-credentials: false
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
       - run: bash ci/build.sh
+      - name: Identifier la version GLF-OS
+        id: version
+        env:
+          VERSION_BRANCH: ${{ github.ref_name }}
+        run: echo "name=${VERSION_BRANCH//\//-}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: unsigned-${{ github.sha }}
+          name: unsigned-${{ steps.version.outputs.name }}-${{ github.sha }}
           path: dist/unsigned/
           if-no-files-found: error
           retention-days: 7

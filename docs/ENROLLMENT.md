@@ -3,7 +3,7 @@
 Ce dossier fournit le shim signé de Rocky Linux 16.1-2.el10, son MokManager et
 le certificat public **GLF-OS TEST ONLY Secure Boot**. Aucun secret n’est inclus.
 Les binaires proviennent du même RPM officiel, verrouillé par SHA-256 dans
-`nix/rocky-shim.nix`, et sont copiés sans modification.
+`pkgs/rocky-shim/default.nix`, et sont copiés sans modification.
 
 ## Construire ou télécharger
 
@@ -11,8 +11,7 @@ Les binaires proviennent du même RPM officiel, verrouillé par SHA-256 dans
 nix build .#enrollment --out-link result-enrollment
 ```
 
-La CI publie aussi ce dossier comme artefact `enrollment-x64-<commit>` à chaque
-validation réussie, sans compilation du noyau ni accès aux secrets de signature.
+Cette construction est explicite et ne fait pas partie des contrôles légers.
 
 ```text
 EFI/BOOT/BOOTX64.EFI       shim Rocky, valide par le firmware

@@ -1,0 +1,30 @@
+name: Bootstrap Secure Boot key
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: glf-secureboot-key-bootstrap
+  cancel-in-progress: false
+jobs:
+  bootstrap:
+    if: >-
+      github.ref_type == 'branch' && github.ref_protected &&
+      vars.GLF_KEY_BOOTSTRAP_ENABLED == 'true'
+    environment: glf-key-bootstrap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Creer une seule fois et conserver la cle dans glf-signing
+        env:
+          GH_TOKEN: ${{ secrets.GLF_KEY_ADMIN_TOKEN }}
+        run: bash ci/bootstrap-key.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: glf-public-certificate
+          path: dist/public/
+          if-no-files-found: error
+          retention-days: 90

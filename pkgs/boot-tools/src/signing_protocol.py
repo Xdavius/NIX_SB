@@ -1,4 +1,4 @@
-"""Public file protocol shared by the client and the GitHub signing job."""
+"""Public file protocol shared by the client and an external signing service."""
 import hashlib
 import json
 from pathlib import Path

@@ -1,38 +1,17 @@
-# Intégration native dans GLF-OS
+# Migration vers le centre noyau/drivers
 
-Le code actif du prototype a été intégré à la branche GLF-OS
-`feature/secureboot-uki`, dans `secureboot/`. `modules/default.nix` importe le
-module directement. Aucun input NIX_SB ni patch glf-apps supplémentaire n'est
-nécessaire dans la configuration des postes utilisant cette version GLF-OS.
+NIX_SB centralise désormais la famille noyau dans kernel.json, la version exacte
+via le lock nixpkgs, les définitions de drivers GLF et le service de signature.
+Aucune modification GLF-OS ni suppression des anciens dépôts n’est effectuée.
 
-Le noyau est défini une seule fois dans `secureboot/nix/kernel-packages.nix`,
-partagé avec `modules/boot.nix`. Le catalogue contient les deux drivers maison,
-NVIDIA open, xone, xpadneo, hid-tmff2 et v4l2loopback. NVIDIA utilise la même
-définition pour le système et le catalogue. L'approbation d'un driver ne force
-plus son activation sur tous les postes. Le correctif DEPMOD de v4l2loopback
-évite une collision d'index pendant l'agrégation.
+Le point d’entrée `pkgs.callPackage sourceNixSb {}` expose kernelPackages,
+kernel (image enrichie), drivers, certificates, modulesTree, boot-tools et rocky-shim.
+L’argument kernelPackages du point d’entrée racine est retiré : le choix appartient
+à ce dépôt. La flake expose aussi cet ensemble dans legacyPackages.x86_64-linux.
 
-L'activation se fait par `iso-cfg/customConfig/secureboot-uki.nix`, à importer
-explicitement. Le système doit suivre la révision unstable verrouillée par
-`glf-os/glf-secureboot/nixpkgs`, conserver sa configuration matérielle et fournir
-un jeton GitLab hors du store. Lire `secureboot/README.md` dans GLF-OS.
+Fanatec et new-lg4ff sont maintenus localement dans pkgs/drivers. La sous-flake,
+son lock, les champs git/input du catalogue et le workflow de synchronisation
+des anciens dépôts sont retirés. Les autres drivers peuvent provenir de nixpkgs.
 
-Le dépôt officiel retenu est `xdavius/glf-os`, branche dédiée
-`feature/secureboot-uki`. Le signataire GitLab construit les composants approuvés
-au commit de cette branche ayant déclenché le pipeline. La clé de production sera
-créée une seule fois en CI, dans une variable protégée, masquée et cachée ; son
-certificat public sera publié après validation. Le runner dédié reste à configurer.
-L'ancien service GitHub est désactivé. Voir `secureboot/docs/CI.md` dans GLF-OS.
-
-Les anciens répertoires nix/, pkgs/, integration/ et la flake de NIX_SB restent
-comme banc de tests historique ; ils ne sont plus la source du build signé de
-GLF-OS. Ne pas appliquer l'ancien patch integration/glf-os.patch sur la nouvelle
-branche native.
-
-Validation locale : évaluation de la configuration complète GLF-OS avec NVIDIA
-et gaming ; tests des outils ; deadnix/statix ; construction réelle du noyau et
-des modules ; présence des 21 certificats des sept paquets dans le bundle ;
-démarrage QEMU Secure Boot avec le noyau complet, les deux drivers de volants
-chargés et un module altéré refusé. Le fonctionnement du matériel physique et
-le parcours de signature avec la clé persistante restent à valider après revue
-et activation du signataire GitLab sur la branche dédiée.
+Le service de signature et le bootstrap restent dans NIX_SB. Les anciens
+workflows GitLab et le code GLF-OS ne sont pas modifiés par cette migration.

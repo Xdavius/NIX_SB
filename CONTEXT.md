@@ -1,273 +1,93 @@
-## Décision actuelle : signataire GitLab de production
+# Décision actuelle : centre noyau et drivers GLF
 
-Référence officielle : `https://framagit.org/xdavius/glf-os`, branche dédiée
-`feature/secureboot-uki`. Ne pas modifier `develop`, liée au projet mère.
-L'implémentation active, le catalogue et la CI sont dans `secureboot/` de GLF-OS.
-La clé GLF-OS doit être créée une seule fois dans un job GitLab protégé et rester
-dans une variable protégée, masquée et cachée. Cette solution provisoire est
-acceptée : les jobs autorisés et administrateurs peuvent techniquement accéder
-à la clé. Aucune génération locale ni réutilisation de GLF-TEST en production.
-Le runner isolé et les protections GitLab restent à configurer avant bootstrap.
-Le signataire GitHub est désactivé. Les sections suivantes décrivent l'historique.
+NIX_SB gère le choix du noyau depuis nixpkgs, les drivers GLF et la signature.
+Ne modifier aucun code GLF-OS ni ancien dépôt de driver. Tests légers uniquement
+pour cette passe : aucun build de noyau ni test VM.
 
-# Contexte du prototype GLF-OS
+## Architecture
 
-## Objectif
+- kernel.json sélectionne linuxPackages_6_18 ; flake.lock fixe nixpkgs et donc
+  la version exacte (6.18.57 actuellement).
+- default.nix reçoit pkgs et expose kernelPackages, kernel, drivers, modulesTree,
+  certificates, boot-tools et rocky-shim. La flake exporte aussi legacyPackages.
+- Le consommateur réutilise cet ensemble, sans choisir un autre noyau pour les drivers.
+  callPackage doit recevoir le même nixpkgs que le dépôt pour la signature CI.
+- Fanatec et new-lg4ff sont vos définitions, maintenues directement dans pkgs/drivers.
+  Elles récupèrent leurs sources amont avec version/hash fixes. Aucun remplacement
+  par les définitions nixpkgs. Provenance détaillée dans docs/drivers.md.
+- Catalogue JSON : path local ou package de kernelPackages.
+- Sous-flake, second lock, références input/git et synchronisation des anciens
+  dépôts retirés. Les modifications de drivers se font ici, en revue.
+- Noyau enrichi et certificats partagent l’arbre de modules approuvés. L’image
+  enrichie ne sert pas à compiler les drivers, ce qui évite une boucle.
+- L’UKI et l’initrd restent spécifiques à chaque poste.
 
-Prototyper, avec Nix, un noyau distribué sous forme d’UKI (Unified Kernel
-Image) signé pour GLF-OS, utilisable avec UEFI Secure Boot et capable de charger
-les modules noyau maison signés avec les certificats correspondants.
+## Signature
 
-Le prototype doit prendre en compte les certificats publics `.cer` de ces
-modules dans la chaîne de confiance du noyau. Le mécanisme retenu est
-`kernelPackages.rebuildImage` avec un arbre de confiance séparé (noyau natif + catalogue `pkgs/repo`) ; son résultat
-est validé en VM avec un module NixOS signé et sa variante altérée.
+Paquet glf-secureboot, commandes glf-secureboot-install et glf-secureboot-sign.
+Client et workflows GitHub dans NIX_SB : validation puis signature dans un job
+protégé séparé, bootstrap manuel unique refusant d’écraser les secrets existants.
+La clé privée reste hors dépôt/store/artefacts. Aucun secret créé ni workflow
+distant déclenché. Configuration des protections décrite dans SIGNING-SERVICE.md.
 
-## Choix actés pour le prototype
+## Conventions et validation
 
-- Utiliser exclusivement **NixOS unstable** comme base du prototype, avec une
-  révision de `nixpkgs` verrouillée pour la reproductibilité. La compatibilité
-  avec les branches stables n’entre pas dans le périmètre de ce prototype.
-- Les `.cer` sont générés par **`kmodigest` dans NixOS**. Le code de la révision
-  nixpkgs verrouillée confirme leur agrégation dans
-  `system.modulesTree/lib/modules/<version>/modules.cer`. `rebuildImage` les
-  injecte via `insert-sys-cert` avant la construction de l’UKI. Les signatures
-  de modules kmodigest ne nécessitent pas la clé privée GLF.
-- GLF-OS reste la cible d’intégration ; le choix d’unstable concerne ici le prototype.
-- Réutiliser le **shim déjà signé distribué par Rocky Linux**, accompagné de son
-  **MokManager**, et enrôler le certificat public de la clé **GLF** via MOK.
-  L’objectif est de signer l’UKI avec la clé GLF sans construire un shim GLF
-  nécessitant sa propre signature Microsoft. Les binaires Rocky seront conservés
-  intacts ; leur version, provenance et empreinte devront être verrouillées.
+Documentation en français. Consigner les décisions et les résultats réels.
+Les résultats de build/VM historiques ne valident pas la refonte actuelle.
+La validation de compilation, de chargement des drivers et du parcours de
+signature réel reste à réaliser séparément avant déploiement.
 
-## État du prototype
+Résultats de la centralisation : nix flake check --no-build réussi (noyau
+6.18.57 et ses deux drivers), test léger du catalogue réussi, shellcheck,
+actionlint et git diff --check réussis. Aucun build ni test VM exécuté.
 
-- Flake NixOS unstable verrouillée, cible initiale x86_64 et configuration extensible.
-- Sorties Nix pour le noyau enrichi des certificats, leur bundle et l’UKI non signée.
-- CI GitHub Actions : validations, build manuel, signature GLF et publication Attic simulée.
-- Certificat public de test disponible ; clé privée de test conservée dans GitHub Secrets.
-- Modules maison raccordés dans `pkgs/repo` ; leurs certificats sont présents dans le bundle approuvé.
-- Shim signé Rocky 16.1-2.el10 et MokManager empaquetés sans modification ;
-  dossier d’enrôlement de test disponible via `.#enrollment`.
-- Démarrage Secure Boot validé en QEMU/OVMF via shim Rocky et systemd-boot ; le déploiement sur les postes reste à réaliser.
+## Catalogue complet et version NVIDIA
 
-## Configuration machine et glf-update
+Les sept drivers externes repérés dans GLF-OS/develop sont approuvés :
+hid-fanatecff, new-lg4ff, xone, xpadneo, hid-tmff2, v4l2loopback et nvidia-open.
+Les pilotes natifs restent couverts par le noyau ; xpad-noone est explicitement
+désactivé. v4l2loopback réutilise nixpkgs avec DEPMOD=true pour l’agrégation.
+NVIDIA 615.71.09 et ses hashes sont gérés ici dans pkgs/drivers/nvidia/version.json.
+Le paquet complet sb.nvidia et les modules sb.drivers.nvidia-open partagent cette
+même définition. L’activation reste côté poste, sans modification GLF-OS.
+Validation du catalogue complet : évaluation Nix --no-build réussie pour les sept
+modules et NVIDIA complet, assertions de cohérence noyau/NVIDIA réussies, test
+Python catalogue et git diff --check réussis. Aucune compilation effectuée.
 
-L’UKI de production doit être construite depuis la configuration exacte du poste
-qui lance `glf-update`. Le programme installé utilise `/etc/nixos#GLF-OS`.
-Le module `nix/secure-boot.nix` doit être importé dans cette configuration ;
-`tests/fixtures/machine.nix` sert uniquement aux tests de CI et ne remplace pas
-les définitions matérielles ou système du poste.
+## Ajout xonedo
 
-Les sorties actuelles de la flake et du workflow restent des artefacts de test.
-L’assemblage local d’une UKI propre au poste implique un parcours de signature
-contrôlé par GLF, ou une construction centrale par configuration machine. La clé
-privée GLF ne doit pas être distribuée aux postes. Ce raccordement à `glf-update`
-est fourni par l’installateur du module ; voir [INTEGRATION-GLF.md](docs/INTEGRATION-GLF.md).
+Huitième entrée : OpenGamingCollective/xonedo, commit
+982cbcb019ae4d2bee5ae69385223409ee555c88. Définition locale, installation Kbuild
+avec kmodigest, répertoire extra/xonedo pour distinguer les fichiers de xone.
+Même noms de modules xone_* : le poste doit choisir l’une des variantes.
+Aucun remplacement automatique de xone/xpadneo ni changement GLF-OS.
+Validation xonedo : nix flake check --no-build et test léger du catalogue réussis,
+git diff --check propre. Aucun build, chargement matériel ou test VM exécuté.
 
-## Clé de test et future clé de production
+Suite légère complète relancée à la demande de l’utilisateur : ci/check.sh
+réussi (code 0), évaluation Nix de toutes les sorties dont huit drivers, noyau
+6.18.57 et NVIDIA 615.71.09, shellcheck/actionlint et 9 tests Python réussis.
+Le refus « dépôt public » affiché est un test négatif attendu du client simulé.
+Aucun appel GitHub réel, aucune clé créée, aucun build ni démarrage VM.
 
-Une clé RSA 3072 bits persistante dédiée aux tests a été créée et enregistrée dans
-l’environnement GitHub `glf-signing`. Son certificat public est
-`certificates/GLF-TEST.cer`, avec le sujet `GLF-OS TEST ONLY Secure Boot`.
-`GLF_SIGNING_ENABLED=true` active le parcours PEM uniquement pour cette clé de
-test. La copie privée temporaire locale a été supprimée. La signature d’un stub
-EFI a été vérifiée, sans lancer le build complet ni enrôler le certificat.
+## Validation réelle autorisée et exécutée
 
-La limitation de GitHub Secrets (extraction techniquement possible par un
-administrateur) est acceptée pour les tests. La clé GLF de production n’existe
-pas encore ; son exigence de non-exportabilité reste un sujet distinct.
+L’utilisateur a demandé de passer aux vrais builds/tests. Résultats détaillés
+et limites dans docs/VALIDATION.md : noyau et UKI construits, 29 certificats des
+8 drivers présents, signatures PE réelles avec clé jetable, démarrages Secure Boot
+réussis en VM pour xone puis xonedo, module altéré refusé. Les pilotes de volants,
+xpadneo, v4l2loopback et modules Xbox testés se chargent. NVIDIA n’a pas été testé
+sur GPU. Ni CI distante ni clé persistante ni installation sur l’hôte.
+Correction du script d’export pour remplacer les anciens fichiers en lecture seule.
 
-## CI, publication et clé GLF
+## Branches par version
 
-La CI doit construire le noyau contenant les `.cer` et l’UKI, puis les signer avec
-la même clé privée GLF persistante. Le build Nix s’exécute sans cette clé. La
-signature se fait dans un job séparé, sur branche protégée et via l’environnement
-GitHub `glf-signing`, déjà configuré pour la clé de test.
-
-Sans infrastructure de signature dédiée, la première implémentation utilise des
-secrets d’environnement GitHub. La clé ne doit apparaître ni dans le dépôt, ni
-dans le store Nix, ni dans les logs, caches ou artefacts. Ce mécanisme ne rend pas
-la clé non exportable : une évolution vers HSM/service de signature est nécessaire
-pour cette garantie. La CI ne régénère jamais la clé GLF.
-
-La publication Attic est strictement simulée pour cette étape. Elle produit un
-manifeste sans transfert réseau. Les artefacts EFI signés restent distincts des
-sorties Nix non signées ; leur import dans le store est à prévoir pour Attic réel.
-Voir [docs/CI.md](docs/CI.md) pour les paramètres et les limites de sécurité.
-
-## Dépôt principal GLF-OS
-
-Le projet principal est
-[glf-os](https://framagit.org/gaming-linux-fr/glf-os/glf-os).
-Si le prototype a besoin de consulter ou de réutiliser sa configuration, utiliser
-la branche **`develop`**. Cette référence n’impose pas d’ajouter GLF-OS comme
-dépendance tant que ce n’est pas nécessaire.
-
-En cas d’intégration au build, verrouiller un commit issu de `develop` pour
-préserver la reproductibilité. Le choix de NixOS unstable pour le prototype reste
-inchangé. Le dépôt `app-glf-os` ci-dessous constitue une référence distincte pour
-les modules ; aucune branche n’a encore été imposée pour celui-ci.
-
-## Modules de référence
-
-Le dépôt [app-glf-os](https://framagit.org/gaming-linux-fr/glf-os/app-glf-os)
-est la source indiquée pour les deux premiers modules à intégrer :
-
-- `hid-fanatek` (nom communiqué, orthographe et attribut Nix à vérifier dans la source) ;
-- `new-lg4ff`.
-
-Les définitions sont maintenant dans `pkgs/repo/hid-fanatek` et
-`pkgs/repo/new-lg4ff`, avec versions et hashes verrouillés et installation Kbuild
-préservant kmodigest. `pkgs/repo/default.nix` est la liste de confiance revue.
-
-## Exigence d’extension aux paquets
-
-Le prototype doit permettre d’ajouter des paquets depuis deux types de sources :
-
-- **Locales** : définitions Nix et/ou sources conservées dans ce projet.
-- **Git externes** : dépôt référencé par son URL, avec une révision verrouillée
-  pour rendre les builds reproductibles.
-
-L’ajout doit passer par une configuration déclarative extensible, sans modifier
-le mécanisme central d’assemblage et de signature de l’UKI pour chaque paquet.
-Le point d’extension des modules est le catalogue revu `pkgs/repo/default.nix`.
-`environment.systemPackages` reste le point d’extension des applications. Les
-sources externes se déclarent comme inputs verrouillés dans `flake.nix` ; les
-définitions de build peuvent être locales ou fournies par ces inputs.
-
-Une URL Git désigne une source ; elle ne suffit pas à définir la compilation.
-Pour les dépôts qui fournissent déjà un paquet Nix, prévoir la sélection de son
-attribut ou de sa définition. Pour les autres, prévoir une définition Nix locale
-qui construit les sources externes. Le support ne doit donc pas imposer que tous
-les dépôts externes fournissent une flake.
-
-Distinguer deux usages dans cette configuration :
-
-- **Modules noyau** : compilation pour le noyau cible, signature, déclaration des
-  certificats de confiance nécessaires et installation ; inclusion dans l’initrd
-  uniquement si le démarrage le nécessite.
-- **Paquets applicatifs ou utilitaires** : installation dans le système cible,
-  avec inclusion éventuelle dans l’initrd selon le besoin. Ils ne suivent pas le
-  mécanisme de signature des modules noyau et ne sont pas tous embarqués dans l’UKI.
-
-Les références aux certificats publics doivent être séparées des références aux
-clés privées. L’ajout d’un dépôt Git ne suffit pas à accorder la confiance à ses
-modules : seuls le noyau natif et les paquets approuvés dans `pkgs/repo`
-alimentent le bundle de certificats injecté. Le bundle ouvert de la machine
-n’est plus utilisé pour établir la confiance.
-
-## Distinction des chaînes de confiance
-
-- La signature de l’UKI doit être reconnue par la chaîne de démarrage Secure Boot
-  via le shim Rocky et le certificat GLF enrôlé dans MOK.
-- Les signatures des modules maison doivent être reconnues par le noyau exécuté.
-- Signer l’UKI ne suffit pas à rendre les certificats des modules fiables pour le
-  noyau. Copier des `.cer` dans l’image ne suffit pas non plus : leur intégration
-  dans un trousseau de confiance adapté doit être explicitement mise en œuvre.
-
-## Démarrage via le shim Rocky et enrôlement GLF
-
-Le parcours retenu et testé en VM est : firmware UEFI avec Secure Boot actif →
-shim signé Rocky Linux → systemd-boot signé GLF → UKI signée GLF.
-Le nom `grubx64.efi` attendu par le shim contient systemd-boot dans l’installation
-normale. Le support d’enrôlement seul y place MokManager.
-
-L’enrôlement concerne le **certificat public** GLF dans la liste MOK gérée par
-shim, et non la clé privée ni un remplacement des clés du firmware. Prévoir une
-demande d’import via `mokutil`, puis sa confirmation au redémarrage dans le
-MokManager correspondant au shim Rocky.
-
-La machine de test doit faire confiance à l’autorité qui a signé ce shim et ne
-pas en révoquer le binaire. Vérifier la compatibilité avec les politiques de
-révocation DBX/SBAT et les exigences du shim retenu pour les images suivantes.
-
-L’enrôlement GLF pour le démarrage ne résout pas à lui seul la confiance dans les
-`.cer` générés par `kmodigest` pour les modules. Leur intégration au noyau conserve
-son propre parcours de validation.
-
-Référence de fonctionnement : [documentation amont de shim](https://github.com/rhboot/shim/blob/main/README.md).
-Les capacités de la version livrée par Rocky devront être vérifiées séparément.
-
-## Travail restant sur cible
-
-- Fusionner le workflow distant sur la branche protégée, puis tester une demande
-  avec la clé GLF de test conservée dans GitHub.
-- Appliquer l’intégration glf-apps à une configuration de test entièrement unstable.
-- Construire et charger `hid-fanatek` et `new-lg4ff` pour le noyau sélectionné.
-- Tester l’enrôlement interactif MOK et la compatibilité DBX/SBAT du firmware réel.
-- Vérifier le refus des images EFI non approuvées sur ce matériel.
-- Prévoir la gestion de l’espace ESP, les mises à jour hors ligne et l’évolution
-  du service de signature avant une utilisation de production.
-
-## Critères de validation
-
-- Un noyau enrichi et une UKI signés GLF sont produits par la CI à partir d’une
-  configuration versionnée, sans publication de clé privée.
-- La publication Attic simulée produit un manifeste explicite sans aucun envoi.
-- Le build utilise une révision verrouillée de NixOS unstable.
-- Les `.cer` des modules sélectionnés sont récupérés depuis les sorties de
-  génération de `kmodigest` et pris en compte dans la confiance du noyau.
-- La cible démarre cette UKI avec Secure Boot effectivement actif.
-- Le shim Rocky et son MokManager sont utilisés sans modification des binaires signés.
-- L’enrôlement MOK du certificat GLF est validé sur la cible ; l’UKI signée GLF
-  est acceptée après enrôlement et refusée en l’absence de toute confiance GLF.
-- Les modules maison correctement signés se chargent sur le noyau cible.
-- Un module non signé ou signé par une clé non approuvée est refusé dans la
-  configuration de validation retenue.
-- Une UKI dont la signature est invalide est refusée par la chaîne de démarrage.
-- Les versions, empreintes des certificats et résultats des tests sont consignés.
-- Les deux modules de référence sont construits pour le noyau cible et leur
-  chargement est validé sous Secure Boot.
-- Un paquet local supplémentaire et un paquet issu d’un dépôt Git externe peuvent
-  être ajoutés par configuration, sans modifier le mécanisme central de l’UKI.
-- Le cas d’une source Git sans définition Nix est validé avec une définition locale.
-- Les révisions Git externes sont verrouillées ; un paquet ordinaire peut être
-  ajouté indépendamment du parcours de signature des modules noyau.
-
-## Conventions du dépôt
-
-- Rédiger la documentation en français.
-- Mettre à jour ce fichier lorsque des choix techniques sont arrêtés.
-- Ne pas versionner les clés privées ni les secrets de signature ; leur stockage
-  et leur utilisation devront être définis avant l’ajout du processus de signature.
-- Les `.cer` sont des sorties générées à récupérer depuis le build ; leur copie
-  manuelle dans le dépôt ne doit pas être un prérequis. Ils ne sont pas exclus
-  globalement par `.gitignore`.
-- Les sorties Nix `result` et `result-*` à la racine sont ignorées.
-- Ne pas considérer une étape comme validée sans résultat de test consigné.
-
-## Intégration systemd-boot et glf-apps
-
-Le module est désormais opt-in via `glf-securebootUKI.enable`. Il expose un installateur
-raccordé à `system.build.installBootLoader`, assemble l’UKI de la génération du
-poste, obtient ses signatures via GitHub, les vérifie puis installe la chaîne
-shim Rocky → systemd-boot signé → UKI signée. La clé reste dans GitHub.
-Le service attend une revue manuelle ; il n’est utilisable qu’après fusion de
-`sign-request.yml` sur `main`. Les artefacts publics sont refusés par défaut côté
-client. Les anciennes UKI sont conservées, sans purge automatique.
-
-Le paquet est importable via `callPackage`, l’overlay et le module sont exportés
-par la flake. `integration/glf-os.patch` raccorde ces exports à `glf-apps` et au
-module racine GLF-OS ; il est fourni pour revue, sans modification du checkout
-externe. L’UKI signée embarque `module.sig_enforce=1` et `lockdown=integrity`, ce
-qui évite de recompiler le noyau de base uniquement pour forcer ces options.
-Le noyau enrichi et l’UKI de test ont été construits réellement.
-
-Validation locale : noyau et UKI construits ; test QEMU/OVMF avec Secure Boot,
-clé éphémère MOK, lockdown integrity, module efivarfs signé accepté et version
-altérée refusée. Le parcours GitHub réel attend la fusion du workflow sur main.
-Les modules maison et l’enrôlement interactif restent à tester sur cible.
-
-La signature distante reconstruit le noyau et le chargeur depuis le dépôt protégé,
-contrôle le noyau embarqué et reconstitue l’UKI avec le stub approuvé. Elle refuse
-une image issue d’un catalogue modifié localement. La revue du dépôt détermine
-la confiance ; les fichiers .cer ajoutés manuellement ne sont pas importés.
-
-## Intégration native GLF-OS
-
-Le code système a été intégré dans GLF-OS/secureboot, branche
-feature/secureboot-uki. Le catalogue de sept paquets est distinct de leur
-activation conditionnelle. Le noyau et NVIDIA ont une définition partagée avec
-les modules GLF-OS. Le service GitHub reste ici et vérifie les sorties de la
-révision immuable définie dans ci/approved-source.json. Voir docs/MIGRATION-GLF.md.
+À la demande de l’utilisateur, la refonte est publiée sur Rising, nom de la version
+GLF-OS ciblée. Une branche par version : chaque push lance validation et build,
+les PR gardent les contrôles légers. Les artefacts et release.json identifient
+la branche et le commit. La signature exige --ref explicite et branche protégée,
+avec la même clé persistante du dépôt. Aucune génération de clé par version.
+La protection Rising et les autorisations d’environnement ne sont pas configurées
+par les fichiers du dépôt ; elles restent des réglages GitHub.
+Validation avant publication Rising : suite ci/check.sh réussie, export des images
+avec release.json réussi ; le manifeste identifie Rising et la révision nixpkgs.

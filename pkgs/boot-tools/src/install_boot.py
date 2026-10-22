@@ -33,11 +33,20 @@ def atomic_copy(source, destination):
             os.unlink(tmp)
 
 
+def signer_command(config):
+    signer = config.get("signerCommand")
+    if (not isinstance(signer, list) or not signer
+            or not all(isinstance(arg, str) and arg for arg in signer)):
+        raise ValueError("signerCommand doit etre une liste non vide de chaines")
+    return signer
+
+
 def install(config, target, allow_unmounted=False):
+    signer = signer_command(config)
     target = Path(target).resolve(strict=True)
     if not (target / "init").is_file():
         raise ValueError("Generation NixOS sans init")
-    metadata = json.loads((target / "glf-boot.json").read_text())
+    metadata = json.loads((target / "glf-secureboot.json").read_text())
     if metadata.get("version") != 1:
         raise ValueError("Generation incompatible avec le chargeur GLF")
     esp = Path(config["esp"])
@@ -63,14 +72,9 @@ def install(config, target, allow_unmounted=False):
                 "--initrd", metadata["initrd"], "--stub", metadata["stub"],
                 "--cmdline", cmdline, "--os-release", f"@{target}/etc/os-release",
                 "--uname", metadata["kernelVersion"], "--output", unsigned / "glf-os.efi")
-            signer = [config["githubSigner"], "--repo", config["repository"], "--ref", config["ref"],
-                      "--certificate", config["certificate"], "--system", str(target),
-                      "--timeout", str(config["signingTimeout"])]
-            if config.get("tokenFile"):
-                signer += ["--token-file", config["tokenFile"]]
-            if config.get("allowPublicArtifacts"):
-                signer += ["--allow-public-artifacts"]
-            run(*signer, unsigned, signed)
+            # Le transport de signature est fourni par le consommateur.
+            run(*signer, "--certificate", config["certificate"],
+                "--system", str(target), unsigned, signed)
             # Verify again at the deployment boundary, even if the client already did.
             for name in ("kernel.efi", "glf-os.efi", "systemd-bootx64.efi"):
                 run("sbverify", "--cert", config["certificate"], signed / name)

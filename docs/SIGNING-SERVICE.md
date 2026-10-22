@@ -1,71 +1,107 @@
-> Intégration native : voir [MIGRATION-GLF.md](MIGRATION-GLF.md).
-> La source du build signé est désormais `ci/approved-source.json` ; les exemples
-> d’import du prototype séparé ci-dessous sont historiques.
+# Signature gérée dans NIX_SB
 
-# Signature GitHub sans clé privée sur le poste
+`boot-tools` fournit `glf-secureboot-sign`, client du workflow GitHub de ce dépôt. L’installateur
+`glf-secureboot-install --config CONFIG GENERATION` assemble les images puis appelle
+la liste d’arguments `signerCommand` sans shell :
 
-Le workflow `.github/workflows/sign-request.yml` signe des demandes provenant de
-machines GLF-OS. Il doit être fusionné sur `main` avant utilisation. Il utilise
-les secrets de test déjà présents dans `glf-signing`, la protection de `main`,
-la variable `GLF_SIGNING_ENABLED` et l’approbation manuelle existante.
+```text
+COMMANDE [ARGUMENTS] --certificate CERT --system GENERATION DOSSIER_ENTREE DOSSIER_SORTIE
+```
 
-## Demande et validation
+La commande doit rendre `kernel.efi`, `glf-os.efi` et `systemd-bootx64.efi` signés
+dans le dossier de sortie. Elle échoue avec un code non nul en cas de refus.
+Le client utilise une draft release, déclenche `sign-request.yml`, attend le résultat
+et vérifie les images signées. La clé privée ne passe jamais par une dérivation Nix.
 
-`glf-github-sign` crée une release **brouillon** `glf-sign-<UUID>` et y dépose
-`kernel.efi`, `glf-os.efi`, `systemd-bootx64.efi` et `request.json`. Le manifeste
-contient le chemin de génération et les empreintes des trois images. Sa propre
-empreinte est transmise séparément à `workflow_dispatch`.
+Configuration runtime de l’installateur :
 
-Le responsable examine la demande brouillon avant d’approuver l’environnement
-`glf-signing`. Cette approbation est une autorisation de signer ces images, pas
-une simple formalité : le noyau, le chargeur et le stub sont contrôlés contre le
-dépôt approuvé, mais le contenu de l’initrd et la configuration du poste restent
-à examiner. Seuls les collaborateurs autorisés à
-créer des releases et lancer les workflows peuvent soumettre une demande.
+```json
+{
+  "esp": "/boot",
+  "certificate": "/etc/secureboot/GLF.pem",
+  "shim": "/nix/store/…-rocky-shim-signed/share/efi",
+  "signerCommand": ["/nix/store/…-glf-secureboot/bin/glf-secureboot-sign", "--repo", "Xdavius/NIX_SB", "--ref", "Rising", "--token-file", "/run/secrets/github-token", "--timeout", "28800"],
+  "timeout": "5",
+  "canTouchEfiVariables": false
+}
+```
 
-Le job de signature télécharge uniquement les quatre fichiers attendus, vérifie
-le manifeste et le format PE x86_64. Il construit le noyau et systemd-boot depuis
-le checkout protégé et exige leur identité avec les images soumises. Il extrait
-les sections de données de l’UKI, impose `module.sig_enforce=1` et
-`lockdown=integrity`, reconstruit l’UKI avec le stub approuvé et compare le résultat.
-Un stub modifié, un autre noyau embarqué ou une section supplémentaire sont refusés.
-Le bundle de confiance vient uniquement des modules natifs et de `pkgs/repo`.
-Le job rend ensuite la clé disponible exclusivement
-à l’étape de signature. Il ne décompresse ni n’exécute le contenu des images.
-Il publie les images signées et le manifeste comme artefact pendant sept jours.
+`timeout` est le délai du menu systemd-boot, pas celui du signataire.
+Le champ historique `githubSigner` n’est plus accepté.
 
-Le client retrouve son run par UUID, attend sa réussite et télécharge l’artefact.
-Il vérifie la signature contre le certificat public configuré et compare les
-fichiers PE avant/après en excluant seulement les champs modifiés par la signature
-Authenticode et l’alignement final nul. Une image différente, même signée avec
-la bonne clé, est refusée.
+La génération doit contenir `init`, `etc/os-release` et `glf-secureboot.json` :
 
-## Accès du poste
+```json
+{
+  "version": 1,
+  "kernel": "/nix/store/…/bzImage",
+  "initrd": "/nix/store/…/initrd",
+  "stub": "/nix/store/…/linuxx64.efi.stub",
+  "systemdBoot": "/nix/store/…/systemd-bootx64.efi",
+  "ukify": "/nix/store/…/lib/systemd/ukify",
+  "kernelVersion": "VERSION_MODULES",
+  "kernelParams": ["root=LABEL=ROOT", "module.sig_enforce=1", "lockdown=integrity"]
+}
+```
 
-Fournir à root une authentification `gh` ou un fichier de jeton hors du store
-via `glf-securebootUKI.signing.github.tokenFile`. Le jeton doit pouvoir créer une release
-brouillon, envoyer ses assets, lancer le workflow et lire ses runs/artefacts.
-Ne jamais écrire le jeton dans un fichier Nix ou le committer.
+Le consommateur fournit les chemins exacts et les paramètres matériels.
+L’installateur ajoute `init=GENERATION/init`, vérifie les signatures et compare
+le contenu PE retourné avant de copier les images dans l’ESP. Il conserve les
+anciennes UKI. Les tests utilisent une clé éphémère et un répertoire temporaire.
 
-Le dépôt `Xdavius/NIX_SB` est public : les artefacts signés peuvent exposer
-l’initrd et les informations du poste. Le client refuse par défaut cette
-publication ; une machine de test doit explicitement fixer
-`allowPublicArtifacts = true`. Un dépôt privé peut héberger le même workflow
-avec ses propres secrets et protections.
+## Service de ce dépôt
 
-L’attente maximale est configurable. En cas de refus, timeout ou erreur de
-signature, l’installateur ne modifie pas les fichiers amorçables de l’ESP. Les
-releases brouillon restent disponibles pour diagnostic/audit et sont à nettoyer
-manuellement. Aucune publication de release ou suppression de demande n’est
-faite automatiquement.
+`sign-request.yml` accepte les branches de version protégées avec `GLF_SIGNING_ENABLED=true`
+(variable du dépôt). Le premier job construit les composants du commit NIX_SB
+exécuté et vérifie noyau, chargeur, paramètres obligatoires et stub de l’UKI.
+Le second job, dans l’environnement protégé `glf-signing`, signe les fichiers
+validés avec les secrets `GLF_SIGNING_KEY_PEM` et `GLF_SIGNING_CERT_PEM`, et la
+variable d’empreinte `GLF_CERT_SHA256`. Il publie uniquement les images signées,
+le certificat public et le manifeste. Les secrets ne sont pas accessibles au
+job de build. Le consommateur doit utiliser le même nixpkgs, noyau et catalogue.
 
-## Tests et limites
+Configurer `glf-signing` avec approbateurs et accès limité aux branches de version protégées.
+Le client nécessite un jeton capable de créer des draft releases, déclencher
+les workflows et télécharger leurs artefacts. Les postes ne reçoivent jamais
+le jeton d’administration des secrets ni la clé de signature.
+Sur un dépôt public, les artefacts peuvent exposer l’initrd du poste : le client
+refuse ce parcours sauf option explicite `--allow-public-artifacts`. Aucun
+secret d’initrd ne doit être envoyé. Les drafts sont conservées pour audit.
 
-Les tests automatisés utilisent une clé jetable pour vérifier les signatures,
-la correspondance du contenu, les générations et l’échec sans modification de
-l’ESP. Ils ne récupèrent pas la clé persistante de GitHub.
+## Création unique de la clé
 
-Le service impose une revue humaine et un accès réseau à chaque installation.
-Il ne constitue pas une infrastructure de signature de production ni un service
-anonyme pour tous les utilisateurs GLF-OS. Une généralisation demandera une
-politique d’autorisation, une validation des builds et une gestion des quotas.
+Le workflow manuel `bootstrap-key.yml` est également limité aux branches protégées.
+Créer au préalable les environnements `glf-signing` et `glf-key-bootstrap`, avec
+approbation obligatoire et restriction aux branches de version approuvées. Dans `glf-key-bootstrap`,
+fournir `GLF_KEY_ADMIN_TOKEN`, jeton limité à ce dépôt autorisant la lecture et
+l’écriture des secrets et variables d’environnement. `GITHUB_TOKEN` ne suffit pas.
+Activer temporairement la variable de dépôt `GLF_KEY_BOOTSTRAP_ENABLED=true`.
+
+Le job génère une clé RSA 3072 et son certificat, écrit la clé et le certificat
+dans les secrets de `glf-signing`, puis l’empreinte dans sa variable. Il publie
+seulement `GLF.pem`, `GLF.cer` et les informations publiques. Il refuse de démarrer
+si l’un des deux secrets existe déjà, y compris la clé de test historique :
+aucun remplacement ou passage automatique de la clé de test en production.
+
+Après bootstrap, conserver le certificat public, vérifier son empreinte,
+désactiver `GLF_KEY_BOOTSTRAP_ENABLED` et retirer le jeton d’administration.
+En cas d’échec après écriture de la clé, ne pas supprimer celle-ci pour relancer :
+le blocage est volontaire et demande une récupération contrôlée. Le workflow
+ne fournit pas une rotation de clé ni une garantie matérielle de non-exportabilité.
+Les administrateurs et jobs autorisés peuvent techniquement accéder aux secrets.
+
+Aucun workflow n’a été déclenché, aucun secret créé par cette modification.
+Les tests locaux du client simulent GitHub sans réseau ; le parcours réel reste
+à valider après configuration des protections et déploiement des workflows.
+
+## Branches de version GLF-OS
+
+`Rising` est la première branche de version. Le client exige `--ref Rising`
+(ou le nom exact d’une autre version) ; aucun repli implicite vers main.
+La signature reconstruit les composants depuis le commit de la branche ciblée.
+Protéger chaque branche de version et autoriser celle-ci dans les environnements
+GitHub avant d’activer sa signature. Une branche non protégée peut être construite,
+mais ne peut pas utiliser le workflow de signature.
+La clé GLF est commune aux versions et n’est pas régénérée pour une nouvelle branche.
+Les workflows workflow_dispatch doivent aussi exister sur la branche par défaut
+GitHub pour être déclenchables ; `--ref` choisit ensuite la branche exécutée.

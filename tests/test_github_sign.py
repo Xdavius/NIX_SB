@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'pkgs/boot-tools/src'))
 import github_sign
 from signing_protocol import IMAGES
 
@@ -37,7 +37,7 @@ class ClientTests(unittest.TestCase):
                     (signed / 'request.json').write_bytes(b'wrong' if mismatch else (unsigned / 'request.json').read_bytes())
                 return ''
 
-            argv = ['glf-github-sign', '--repo', 'GLF/test', '--certificate', 'public.pem',
+            argv = ['glf-secureboot-sign', '--repo', 'GLF/test', '--ref', 'Rising', '--certificate', 'public.pem',
                     '--system', '/nix/store/test-system', str(unsigned), str(signed)]
             with patch.object(sys, 'argv', argv), patch.object(github_sign, 'gh', gh), \
                  patch.object(github_sign, 'verify_response') as verify:
@@ -56,6 +56,10 @@ class ClientTests(unittest.TestCase):
                 else:
                     github_sign.main()
                     verify.assert_called_once_with(unsigned, signed, 'public.pem')
+                    dispatch = next(c for c in calls if c[:2] == ('workflow', 'run'))
+                    self.assertEqual(dispatch[dispatch.index('--ref') + 1], 'Rising')
+                    runs = next(c for c in calls if c[:2] == ('run', 'list'))
+                    self.assertEqual(runs[runs.index('--branch') + 1], 'Rising')
                     upload = next(c for c in calls if c[:2] == ('release', 'upload'))
                     self.assertEqual({Path(p).name for p in upload[5:]}, {*IMAGES, 'request.json'})
 

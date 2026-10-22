@@ -1,3 +1,0 @@
-{
-  "flake": "git+https://framagit.org/xdavius/glf-os.git?ref=feature/secureboot-uki&rev=73ff014686ed43ee9ab3154ee94eb61e7d837e44&dir=secureboot"
-}

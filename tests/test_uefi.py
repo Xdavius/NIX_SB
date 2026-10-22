@@ -16,6 +16,14 @@ def run(*args, **kw):
 
 
 kernel = Path(sys.argv[1]).resolve(strict=True)
+variant = os.environ.get("GLF_VM_VARIANT", "catalogue")
+if variant not in ("catalogue", "xone", "xonedo"):
+    raise ValueError("GLF_VM_VARIANT: catalogue, xone ou xonedo attendu")
+modules = os.environ["GLF_VM_MODULES" if variant == "catalogue" else "GLF_VM_MODULES_" + variant.upper()]
+drivers = ('hid-fanatec', 'hid-logitech-new')
+if variant != "catalogue":
+    drivers += ('hid_tmff_new', 'hid_xpadneo', 'v4l2loopback', 'xone_dongle', 'xone_gip_gamepad')
+
 with tempfile.TemporaryDirectory(prefix="glf-uefi-") as temp:
     root = Path(temp)
     key, cert = root / "key.pem", root / "cert.pem"
@@ -26,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix="glf-uefi-") as temp:
     (initrd_root / "bin").mkdir(parents=True)
     shutil.copyfile(os.environ["GLF_VM_BUSYBOX"], initrd_root / "bin/busybox")
     (initrd_root / "bin/busybox").chmod(0o755)
-    module = next(Path(os.environ["GLF_VM_MODULES"]).glob("lib/modules/*/kernel/fs/efivarfs/efivarfs.ko*"))
+    module = next(Path(modules).glob("lib/modules/*/kernel/fs/efivarfs/efivarfs.ko*"))
     module_data = subprocess.check_output(["zstd", "-dc", str(module)]) if module.suffix == ".zst" else module.read_bytes()
     if module.suffix == ".xz":
         module_data = lzma.decompress(module_data)
@@ -37,9 +45,9 @@ with tempfile.TemporaryDirectory(prefix="glf-uefi-") as temp:
     (initrd_root / "corrupt.ko").write_bytes(corrupt)
     driver_commands = []
     installed = set()
-    for driver in ('hid-fanatec', 'hid-logitech-new'):
-        version = next((Path(os.environ['GLF_VM_MODULES']) / 'lib/modules').iterdir()).name
-        deps = subprocess.check_output(['modprobe', '--show-depends', '-d', os.environ['GLF_VM_MODULES'],
+    for driver in drivers:
+        version = next((Path(modules) / 'lib/modules').iterdir()).name
+        deps = subprocess.check_output(['modprobe', '--show-depends', '-d', modules,
                                         '-S', version, driver], text=True)
         for line in deps.splitlines():
             if not line.startswith('insmod '):
@@ -129,10 +137,10 @@ poweroff -f
     finally:
         text = log.read_text(errors="replace") if log.exists() else ""
         Path("dist").mkdir(exist_ok=True)
-        Path("dist/uefi-serial.log").write_text(text)
-    assert "GLF_UEFI_BOOT_OK" in text, "Le noyau n'a pas atteint /init : voir dist/uefi-serial.log"
+        Path(f"dist/uefi-{variant}-serial.log").write_text(text)
+    assert "GLF_UEFI_BOOT_OK" in text, "Le noyau n'a pas atteint /init : voir dist/uefi-<variante>-serial.log"
     assert "[integrity]" in text, "Lockdown integrity absent"
-    for driver in ('hid-fanatec', 'hid-logitech-new'):
+    for driver in drivers:
         assert f'GLF_DRIVER_OK_{driver}' in text, f'Module {driver} non charge'
     assert "GLF_CORRUPTED_MODULE_REJECTED" in text, "Module corrompu non rejete"
     assert "Key was rejected" in text, "Rejet de signature non confirme"

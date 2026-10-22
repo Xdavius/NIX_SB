@@ -18,7 +18,7 @@ def gh(*args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", required=True)
-    parser.add_argument("--ref", default="main")
+    parser.add_argument("--ref", required=True, help="Branche de version GLF-OS, par exemple Rising")
     parser.add_argument("--certificate", required=True)
     parser.add_argument("--token-file")
     parser.add_argument("--allow-public-artifacts", action="store_true")
@@ -37,7 +37,7 @@ def main():
     expected = prepare(args.unsigned, args.system)
     tag = "glf-sign-" + uuid.uuid4().hex
     notes = args.unsigned / "review.txt"
-    notes.write_text(f"Demande de signature de test\nSysteme : {args.system}\nSHA256 request.json : {expected}\nVerifier les images avant d'approuver glf-signing.\n")
+    notes.write_text(f"Demande de signature Secure Boot\nSysteme : {args.system}\nSHA256 request.json : {expected}\nVerifier les images avant d'approuver glf-signing.\n")
     gh("release", "create", tag, "--repo", args.repo, "--target", args.ref,
        "--draft", "--title", tag, "--notes-file", str(notes))
     print(f"Demande {tag}. Examiner la release draft dans https://github.com/{args.repo}/releases puis approuver le job glf-signing.", flush=True)
@@ -50,7 +50,7 @@ def main():
     while time.monotonic() < deadline:
         if run_id is None:
             runs = json.loads(gh("run", "list", "--repo", args.repo, "--workflow", "sign-request.yml",
-                                "--event", "workflow_dispatch", "--limit", "100", "--json", "databaseId,displayTitle"))
+                                "--event", "workflow_dispatch", "--branch", args.ref, "--limit", "100", "--json", "databaseId,displayTitle"))
             run_id = next((r["databaseId"] for r in runs if r["displayTitle"] == tag), None)
         if run_id:
             run = json.loads(gh("run", "view", str(run_id), "--repo", args.repo, "--json", "status,conclusion"))

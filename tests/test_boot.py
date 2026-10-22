@@ -12,7 +12,7 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pkgs" / "boot-tools" / "src"))
 from install_boot import install
 from signing_protocol import IMAGES, prepare, validate, verify_response
 
@@ -20,7 +20,7 @@ from signing_protocol import IMAGES, prepare, validate, verify_response
 class BootTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.TemporaryDirectory(prefix="glf-boot-test-")
+        cls.tmp = tempfile.TemporaryDirectory(prefix="glf-secureboot-test-")
         cls.root = Path(cls.tmp.name)
         cls.key = cls.root / "key.pem"
         cls.cert = cls.root / "cert.pem"
@@ -55,13 +55,12 @@ for name in {IMAGES!r}:
             "ukify": os.environ["GLF_TEST_UKIFY"], "kernelVersion": "test",
             "kernelParams": ["root=LABEL=machine-specific", "lockdown=integrity", "module.sig_enforce=1"],
         }
-        (target / "glf-boot.json").write_text(json.dumps(metadata))
+        (target / "glf-secureboot.json").write_text(json.dumps(metadata))
         return target
 
     def config(self, name):
         return {"esp": str(self.root / name), "certificate": str(self.cert),
-                "shim": os.environ["GLF_TEST_SHIM"], "githubSigner": str(self.signer),
-                "repository": "fixture/fixture", "ref": "main", "signingTimeout": 60,
+                "shim": os.environ["GLF_TEST_SHIM"], "signerCommand": [str(self.signer)],
                 "timeout": "5", "canTouchEfiVariables": False}
 
     def test_install_and_rollback(self):
@@ -86,7 +85,7 @@ for name in {IMAGES!r}:
         esp = Path(config["esp"])
         (esp / "loader").mkdir(parents=True)
         (esp / "loader/loader.conf").write_text("old default")
-        config["githubSigner"] = "/does-not-exist"
+        config["signerCommand"] = ["/does-not-exist"]
         with self.assertRaises(FileNotFoundError):
             install(config, self.target("failure"), allow_unmounted=True)
         self.assertEqual((esp / "loader/loader.conf").read_text(), "old default")

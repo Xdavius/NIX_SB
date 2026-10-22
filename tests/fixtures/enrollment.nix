@@ -7,8 +7,8 @@ runCommand "glf-test-enrollment-x64" { nativeBuildInputs = [ openssl ]; } ''
   # Support d'enrolement uniquement : le second etage ouvre MokManager.
   # Ce nom est celui attendu par le shim Rocky ; aucun binaire n'est modifie.
   cp ${rockyShim}/share/efi/mmx64.efi "$out/EFI/BOOT/grubx64.efi"
-  cp ${../certificates/GLF-TEST.cer} "$out/certificates/GLF-TEST.cer"
-  cp ${../docs/ENROLLMENT.md} "$out/README.md"
+  cp ${../../certificates/GLF-TEST.cer} "$out/certificates/GLF-TEST.cer"
+  cp ${../../docs/ENROLLMENT.md} "$out/README.md"
   cp ${rockyShim}/share/doc/* "$out/info/"
   openssl x509 -inform DER -in "$out/certificates/GLF-TEST.cer" \
     -noout -subject -dates -fingerprint -sha256 > "$out/info/GLF-TEST.txt"

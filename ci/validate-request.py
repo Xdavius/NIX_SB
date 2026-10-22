@@ -1,31 +1,26 @@
-import os
+"""Validation locale d'une demande contre des composants approuves par l'operateur.
+
+Aucun telechargement, build ou transport distant implicite.
+"""
+import argparse
 from pathlib import Path
-import re
-import subprocess
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
-from signing_protocol import IMAGES, validate
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'pkgs/boot-tools/src'))
+from signing_protocol import validate
 from signing_policy import validate_policy
-from approved_source import approved_source
 
-tag = os.environ["REQUEST_TAG"]
-if not re.fullmatch(r"glf-sign-[a-f0-9]{32}", tag):
-    raise ValueError("Identifiant de demande invalide")
-Path("dist/unsigned").mkdir(parents=True, exist_ok=False)
-for name in (*IMAGES, "request.json"):
-    subprocess.run(["gh", "release", "download", tag, "--repo", os.environ["GITHUB_REPOSITORY"],
-                    "--pattern", name, "--dir", "dist/unsigned"], check=True)
-validate("dist/unsigned", os.environ["REQUEST_SHA256"])
-# Le checkout main protege approuve une revision GLF-OS immuable.
-# Cette reference ne vient jamais des images ni des parametres de la demande.
-source = approved_source()
 
-def approved(attribute):
-    return Path(subprocess.check_output([
-        "nix", "build", "--no-update-lock-file", "--no-link", "--print-out-paths", source + "#" + attribute + ".out"
-    ], text=True).strip())
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('directory')
+    parser.add_argument('--sha256', required=True)
+    for name in ('kernel', 'bootloader', 'stub', 'ukify'):
+        parser.add_argument('--' + name, required=True)
+    args = parser.parse_args()
+    validate(args.directory, args.sha256)
+    validate_policy(args.directory, args.kernel, args.bootloader, args.stub, args.ukify)
 
-validate_policy("dist/unsigned", approved("kernel") / "bzImage",
-                approved("systemd-boot") / "systemd-bootx64.efi",
-                approved("signing-stub") / "linuxx64.efi.stub",
-                approved("signing-ukify") / "lib/systemd/ukify")
+
+if __name__ == '__main__':
+    main()
