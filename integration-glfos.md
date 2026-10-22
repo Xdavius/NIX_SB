@@ -38,7 +38,8 @@ Chaque release publique contient :
 
 - `glf-secureboot.tar.gz` : noyau signé, systemd-boot signé, shim, MokManager,
   certificat GLF PEM/DER, certificats des modules et manifestes.
-- `release.json` : URL de l’archive, hash Nix, profil, branche et commit.
+- `release.json` : URL, `archiveHash` pour le téléchargement, hash NAR décompressé
+  pour diagnostic, profil, branche et commit (format v2).
 - `build.json` : versions et révisions de la construction.
 
 Le tag contient le profil, le hash du nom de branche et le commit complet. La publication
@@ -148,7 +149,8 @@ réussit. Une mise à jour du channel actuel ou un rétroportage reste nécessai
 pour sa publication ; la CI n’utilise pas testing à sa place. Aucun dépôt
 channels n’a été modifié. Voir [les commandes CI par profil](docs/CI.md).
 
-`sb.signed.bundle` télécharge l’archive par hash fixe et vérifie les signatures
+`sb.signed.bundle` télécharge l’archive compressée par `archiveHash` fixe,
+la décompresse dans une dérivation normale et vérifie les signatures
 avec le certificat épinglé dans NIX_SB. Il compare également shim et MokManager
 aux originaux, et le contenu du noyau/chargeur à celui construit depuis le
 nixpkgs fourni. Un overlay incompatible fait échouer la construction.
