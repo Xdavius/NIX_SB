@@ -1,21 +1,21 @@
-{ lib, fetchzip, runCommand, python3, openssl, sbsigntool, jq
+{ lib, fetchurl, runCommand, python3, openssl, sbsigntool, jq
 , kernel, systemd, rockyShim, releaseFile }:
 let
   release = builtins.fromJSON (builtins.readFile releaseFile);
-  valid = release.version == 1
+  valid = release.version == 2
     && builtins.match "[a-f0-9]{40}" release.commit != null
     && builtins.isString release.branch
     && builtins.elem release.profile [ "current" "testing" ];
-  source = assert valid; fetchzip {
+  source = assert valid; fetchurl {
     name = "glf-signed-${release.commit}";
-    inherit (release) url hash;
-    stripRoot = false;
+    inherit (release) url;
+    hash = release.archiveHash;
   };
   bundle = runCommand "glf-secureboot-signed-${release.commit}" {
     nativeBuildInputs = [ python3 openssl sbsigntool jq ];
   } ''
     mkdir -p "$out"
-    cp -r ${source}/. "$out/"
+    tar -xzf ${source} -C "$out"
     chmod -R u+w "$out"
     cd "$out"
     sha256sum --check SHA256SUMS

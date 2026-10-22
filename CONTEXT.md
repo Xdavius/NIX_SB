@@ -243,3 +243,13 @@ explicitement indisponible et non bloquant. uki.yml appelle seulement testing ;
 current-unavailable affiche un avertissement sans construire ni signer. Le statut
 validate exige le succès de testing : aucun échec testing n’est ignoré. Aucune
 protection de branche ou restriction de secrets n’est supprimée.
+
+
+## Première publication et correction de consommation
+
+PR5 fusionnée (9539547) ; run 39820736098 : build/sign/publish testing réussis.
+Current explicitement indisponible. Import réel a révélé que fetchzip décompressé
+est refusé par Nix (fixed-output derivations must not reference store paths).
+Correction : descripteur v2 avec archiveHash, fetchurl de l’archive compressée,
+extraction et vérifications dans une dérivation normale. Le test embarque
+maintenant une référence réelle au store pour couvrir ce cas.

@@ -31,7 +31,8 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     (unsigned / "modules.cer").write_bytes(b"fixture-certificates")
     (unsigned / "bundle.sha256").write_text("fixture\n")
     (unsigned / "nix-closure.json").write_text("{}")
-    (unsigned / "store-paths.txt").write_text("/nix/store/fixture\n")
+    # Include real store references: an unpacked fixed-output fetch must fail.
+    (unsigned / "store-paths.txt").write_text(str(stub) + "\n")
     hashes = "".join(
         f"{hashlib.sha256((unsigned / name).read_bytes()).hexdigest()}  {name}\n"
         for name in ("kernel.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi", "modules.cer", "bundle.sha256")
@@ -59,6 +60,8 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     run(['bash', str(repo / 'ci/package-release.sh')], env={**env, 'GITHUB_REPOSITORY': 'Xdavius/NIX_SB'})
     descriptor = json.loads(Path('dist/release/release.json').read_text())
     assert descriptor['hash'].startswith('sha256-')
+    assert descriptor['version'] == 2
+    assert descriptor['archiveHash'] == run(['nix', 'hash', 'file', 'dist/release/glf-secureboot.tar.gz']).strip()
     assert descriptor['commit'] == 'a' * 40
     Path('unpacked').mkdir()
     run(['tar', '-xzf', 'dist/release/glf-secureboot.tar.gz', '-C', 'unpacked'])
@@ -87,7 +90,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
   pkgs = import (builtins.toPath {nixpkgs}) {{ system = "x86_64-linux"; }};
   signed = pkgs.callPackage ./pkgs/signed {{
     releaseFile = ./release.json;
-    fetchzip = args: pkgs.fetchzip (args // {{ url = "file://${{./archive.tar.gz}}"; }});
+    fetchurl = args: pkgs.fetchurl (args // {{ url = "file://${{./archive.tar.gz}}"; }});
     kernel = {{ outPath = builtins.path {{ path = ./kernel; }}; version = "fixture"; }};
     systemd = ./systemd;
     rockyShim = ./shim;
