@@ -129,8 +129,9 @@ Les noms Git vérifiés sont `glf-os-channels.git` et `testing-channels.git`,
 sous le groupe Framagit channels-glfos. Chacun fournit son couple nixpkgs et
 nixpkgs-unstable. Testing n’est donc pas un synonyme de nixpkgs-unstable.
 
-Pour chaque branche de version NIX_SB, la CI traite les deux profils séparément,
-avec leurs propres paquets, artefacts et releases. Dans GLF-OS, conserver les
+Les deux profils ont leurs propres paquets, artefacts et releases.
+Temporairement, seule la CI testing est exécutée et requise pour fusionner :
+current est signalé indisponible et ne produit aucun artefact ni release. Dans GLF-OS, conserver les
 channels correspondant à la variante installée et choisir le descripteur du
 même profil dans glf-apps. Le commit source NIX_SB peut être commun aux deux,
 mais les publications signées ne sont pas interchangeables.

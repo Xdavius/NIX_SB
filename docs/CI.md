@@ -12,12 +12,15 @@ Le socle noyau est le `nixpkgs` du profil. **Testing n’est pas l’entrée uns
 du canal current.** Les deux sources et leurs pins sont enregistrés séparément
 dans `flake.lock` ; aucun rafraîchissement implicite n’a lieu pendant un build.
 
-`uki.yml` orchestre une matrice current/testing avec `fail-fast: false` et appelle
-`channel.yml`. Chaque appel possède sa propre chaîne validation → construction →
-signature → publication : un échec current n’empêche pas testing de progresser.
-Le statut global `validate` exige cependant la réussite des deux profils, afin
-de conserver un contrôle obligatoire sur les PR. Les PR ne construisent pas de
-noyau et ne signent ni ne publient.
+Exception temporaire autorisée : `uki.yml` n’exécute que le parcours testing
+via `channel.yml`. Le job `current-unavailable` affiche explicitement un
+avertissement et un résumé ; il ne prétend pas valider current. Aucun build,
+signature ou publication current n’est lancé.
+
+Le statut obligatoire `validate` exige la réussite de testing. Un échec ou une
+annulation testing bloque toujours la fusion. Les PR ne construisent pas de noyau
+et ne signent ni ne publient. Pour réactiver current, résoudre sa compatibilité
+puis restaurer son parcours et son contrôle obligatoire dans le workflow.
 
 La signature exige une branche protégée autorisée dans l’environnement
 `glf-signing-production` et `GLF_SIGNING_ENABLED=true`. Cette restriction vaut

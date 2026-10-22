@@ -1,8 +1,9 @@
 # NIX_SB — noyau et drivers GLF
 
 Une branche correspond à une version GLF-OS : **Rising** pour la version actuelle.
-Chaque push déclenche deux parcours indépendants : current (glf-os-channels)
-et testing (testing-channels), chacun avec ses pins et publications.
+Deux profils sont définis : current (glf-os-channels) et testing (testing-channels).
+Temporairement, seul testing est construit et publié ; current est explicitement
+indisponible et non bloquant pour la fusion. Les contrôles testing restent obligatoires.
 
 Ce dépôt centralise le choix du noyau nixpkgs, les définitions des drivers GLF,
 le catalogue de confiance et les outils de signature Secure Boot.

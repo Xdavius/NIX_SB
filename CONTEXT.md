@@ -234,3 +234,12 @@ Artefacts, tags et descripteurs incluent le profil. GLF_CHANNEL choisit les sort
 pour ci/build.sh et ci/check.sh. Le paquet signé vérifie aussi le profil du manifeste.
 Current reste bloqué par rebuildImage absent ; testing s’évalue correctement.
 Aucun GLF-OS ni channel modifié, aucune publication distante lancée.
+
+
+## Exception temporaire current explicitement autorisée
+
+L’utilisateur autorise la fusion et la publication testing uniquement, current
+explicitement indisponible et non bloquant. uki.yml appelle seulement testing ;
+current-unavailable affiche un avertissement sans construire ni signer. Le statut
+validate exige le succès de testing : aucun échec testing n’est ignoré. Aucune
+protection de branche ou restriction de secrets n’est supprimée.
