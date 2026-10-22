@@ -20,7 +20,7 @@ class BootstrapTests(unittest.TestCase):
             with self.subTest(secret=secret), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 gh = root / 'gh'
-                gh.write_text('#!/bin/sh\n[ "$1 $2" = "secret list" ] || exit 99\nprintf "%s\\n" ' + secret + '\n')
+                gh.write_text('#!/bin/sh\n[ "$1 $2" = "secret list" ] || exit 99\ncase "$*" in *"--env glf-signing-production"*) ;; *) exit 98 ;; esac\nprintf "%s\\n" ' + secret + '\n')
                 gh.chmod(0o700)
                 openssl = root / 'openssl'
                 openssl.write_text('#!/bin/sh\ntouch "' + str(root / 'generated') + '"\nexit 99\n')

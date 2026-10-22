@@ -54,13 +54,13 @@ anciennes UKI. Les tests utilisent une clé éphémère et un répertoire tempor
 `sign-request.yml` accepte les branches de version protégées avec `GLF_SIGNING_ENABLED=true`
 (variable du dépôt). Le premier job construit les composants du commit NIX_SB
 exécuté et vérifie noyau, chargeur, paramètres obligatoires et stub de l’UKI.
-Le second job, dans l’environnement protégé `glf-signing`, signe les fichiers
+Le second job, dans l’environnement protégé `glf-signing-production`, signe les fichiers
 validés avec les secrets `GLF_SIGNING_KEY_PEM` et `GLF_SIGNING_CERT_PEM`, et la
 variable d’empreinte `GLF_CERT_SHA256`. Il publie uniquement les images signées,
 le certificat public et le manifeste. Les secrets ne sont pas accessibles au
 job de build. Le consommateur doit utiliser le même nixpkgs, noyau et catalogue.
 
-Configurer `glf-signing` avec approbateurs et accès limité aux branches de version protégées.
+Configurer `glf-signing-production` avec approbateurs et accès limité aux branches de version protégées.
 Le client nécessite un jeton capable de créer des draft releases, déclencher
 les workflows et télécharger leurs artefacts. Les postes ne reçoivent jamais
 le jeton d’administration des secrets ni la clé de signature.
@@ -71,14 +71,14 @@ secret d’initrd ne doit être envoyé. Les drafts sont conservées pour audit.
 ## Création unique de la clé
 
 Le workflow manuel `bootstrap-key.yml` est également limité aux branches protégées.
-Créer au préalable les environnements `glf-signing` et `glf-key-bootstrap`, avec
+Créer au préalable les environnements `glf-signing-production` et `glf-key-bootstrap`, avec
 approbation obligatoire et restriction aux branches de version approuvées. Dans `glf-key-bootstrap`,
 fournir `GLF_KEY_ADMIN_TOKEN`, jeton limité à ce dépôt autorisant la lecture et
 l’écriture des secrets et variables d’environnement. `GITHUB_TOKEN` ne suffit pas.
 Activer temporairement la variable de dépôt `GLF_KEY_BOOTSTRAP_ENABLED=true`.
 
 Le job génère une clé RSA 3072 et son certificat, écrit la clé et le certificat
-dans les secrets de `glf-signing`, puis l’empreinte dans sa variable. Il publie
+dans les secrets de `glf-signing-production`, puis l’empreinte dans sa variable. Il publie
 seulement `GLF.pem`, `GLF.cer` et les informations publiques. Il refuse de démarrer
 si l’un des deux secrets existe déjà, y compris la clé de test historique :
 aucun remplacement ou passage automatique de la clé de test en production.
@@ -105,3 +105,47 @@ mais ne peut pas utiliser le workflow de signature.
 La clé GLF est commune aux versions et n’est pas régénérée pour une nouvelle branche.
 Les workflows workflow_dispatch doivent aussi exister sur la branche par défaut
 GitHub pour être déclenchables ; `--ref` choisit ensuite la branche exécutée.
+
+## Récupération par un poste GLF-OS
+
+Le certificat public de production doit être livré au poste avec la configuration
+approuvée. Il ne doit pas être choisi en faisant confiance au certificat inclus
+dans une réponse téléchargée. `GLF-TEST` reste réservé aux tests et ne convient pas
+à l’enrôlement de production. La clé privée ne quitte pas le job de signature.
+
+Parcours actuellement implémenté :
+
+1. Le poste utilise le noyau/les outils de la révision approuvée de Rising.
+2. `glf-secureboot-install` assemble l’UKI de sa génération.
+3. `glf-secureboot-sign --ref Rising` envoie les trois images et un manifeste
+   dans une draft release, puis déclenche la validation/signature GitHub.
+4. Le client retrouve le run par identifiant de demande et branche, attend sa
+   réussite puis télécharge l’artefact avec `gh run download`.
+5. Il compare le manifeste à sa demande, vérifie les signatures avec le certificat
+   public déjà approuvé sur le poste et compare le contenu PE aux images envoyées.
+6. L’installateur refait ces vérifications avant d’écrire dans l’ESP. Une erreur
+   ou un refus empêche l’installation de cette génération ; les anciennes restent.
+
+Les artefacts sont conservés sept jours. Ce mécanisme répond à une demande de
+signature : il ne fournit pas encore un dépôt public permanent de noyaux signés,
+ni un cache Nix binaire. Une UKI préfabriquée pour une machine fictive ne convient
+pas aux configurations matérielles des utilisateurs.
+
+**Limite du déploiement actuel :** ce client GitHub exige sur le poste un jeton
+permettant les uploads et workflow_dispatch ; ce n’est pas un téléchargement
+public anonyme adapté à toute une flotte. Ne jamais distribuer le jeton du
+bootstrap. Pour un déploiement général, prévoir un service de signature avec
+identité de poste et permissions limitées, ou une construction centrale des
+configurations machines. Le dépôt étant public, l’initrd soumis risque d’être
+accessible dans les artefacts ; le client refuse cette exposition par défaut.
+Aucun envoi de configuration réelle n’a été autorisé ni effectué pendant cette
+préparation. Le choix du transport de production reste à arrêter avant les postes.
+
+## Séparation test / production
+
+L’environnement historique `glf-signing` conserve les secrets de test existants.
+Les workflows actuels utilisent exclusivement `glf-signing-production`.
+L’environnement `glf-key-bootstrap` reçoit uniquement le jeton temporaire de
+provisionnement. La création de l’environnement ne constitue pas la création
+ni la validation de la clé : celle-ci doit être confirmée par un run réussi et
+par l’empreinte du certificat public récupéré.

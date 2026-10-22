@@ -91,3 +91,16 @@ La protection Rising et les autorisations d’environnement ne sont pas configur
 par les fichiers du dépôt ; elles restent des réglages GitHub.
 Validation avant publication Rising : suite ci/check.sh réussie, export des images
 avec release.json réussi ; le manifeste identifie Rising et la révision nixpkgs.
+
+## Préparation production
+
+L’utilisateur demande la création de la clé réelle et le parcours de récupération.
+Inspection : glf-signing contient encore les deux secrets de test (empreinte du
+certificat 50AF89E91B921AAC33E91A6CC48497658B5DC5E32ABB561AF7A15CF226DCC08C).
+Créer une clé distincte dans glf-signing-production, jamais remplacer la clé test.
+Environnements production et bootstrap préparés avec reviewer Xdavius et branche
+Rising autorisée. Un jeton temporaire Environments:write doit être fourni dans
+GLF_KEY_ADMIN_TOKEN ; ne pas réutiliser/transférer l’authentification locale.
+Le workflow doit être sur la branche par défaut : choix demandé à l’utilisateur.
+Aucune clé de production créée à ce stade. Récupération actuelle via client GitHub,
+non adaptée à une flotte anonyme sans service intermédiaire ; voir documentation.

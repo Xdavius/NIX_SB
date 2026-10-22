@@ -39,7 +39,7 @@ jobs:
           if-no-files-found: error
   sign:
     needs: validate
-    environment: glf-signing
+    environment: glf-signing-production
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

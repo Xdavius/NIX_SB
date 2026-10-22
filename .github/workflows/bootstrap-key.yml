@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Creer une seule fois et conserver la cle dans glf-signing
+      - name: Creer une seule fois et conserver la cle dans glf-signing-production
         env:
           GH_TOKEN: ${{ secrets.GLF_KEY_ADMIN_TOKEN }}
         run: bash ci/bootstrap-key.sh

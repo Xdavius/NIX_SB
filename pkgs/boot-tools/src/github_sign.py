@@ -37,10 +37,10 @@ def main():
     expected = prepare(args.unsigned, args.system)
     tag = "glf-sign-" + uuid.uuid4().hex
     notes = args.unsigned / "review.txt"
-    notes.write_text(f"Demande de signature Secure Boot\nSysteme : {args.system}\nSHA256 request.json : {expected}\nVerifier les images avant d'approuver glf-signing.\n")
+    notes.write_text(f"Demande de signature Secure Boot\nSysteme : {args.system}\nSHA256 request.json : {expected}\nVerifier les images avant d'approuver glf-signing-production.\n")
     gh("release", "create", tag, "--repo", args.repo, "--target", args.ref,
        "--draft", "--title", tag, "--notes-file", str(notes))
-    print(f"Demande {tag}. Examiner la release draft dans https://github.com/{args.repo}/releases puis approuver le job glf-signing.", flush=True)
+    print(f"Demande {tag}. Examiner la release draft dans https://github.com/{args.repo}/releases puis approuver le job glf-signing-production.", flush=True)
     gh("release", "upload", tag, "--repo", args.repo,
        *[str(args.unsigned / name) for name in (*IMAGES, "request.json")])
     gh("workflow", "run", "sign-request.yml", "--repo", args.repo, "--ref", args.ref,
