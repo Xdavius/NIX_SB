@@ -1,0 +1,4 @@
+subject=CN = GLF-OS Secure Boot
+notBefore=Oct 22 10:36:39 2026 GMT
+notAfter=Oct 19 10:36:39 2036 GMT
+sha256 Fingerprint=63:3F:DE:4E:91:1D:10:02:BB:D5:8B:39:45:D0:2B:C4:3F:1B:84:0E:6F:0D:5C:95:3B:57:3E:77:A6:56:BF:BF

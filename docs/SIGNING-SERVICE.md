@@ -90,9 +90,9 @@ le blocage est volontaire et demande une récupération contrôlée. Le workflow
 ne fournit pas une rotation de clé ni une garantie matérielle de non-exportabilité.
 Les administrateurs et jobs autorisés peuvent techniquement accéder aux secrets.
 
-Aucun workflow n’a été déclenché, aucun secret créé par cette modification.
-Les tests locaux du client simulent GitHub sans réseau ; le parcours réel reste
-à valider après configuration des protections et déploiement des workflows.
+Le bootstrap de production a été exécuté avec succès (voir ci-dessous).
+Les tests du client et de signature restent distincts : le parcours de signature
+avec la clé persistante doit encore être validé.
 
 ## Branches de version GLF-OS
 
@@ -149,3 +149,14 @@ L’environnement `glf-key-bootstrap` reçoit uniquement le jeton temporaire de
 provisionnement. La création de l’environnement ne constitue pas la création
 ni la validation de la clé : celle-ci doit être confirmée par un run réussi et
 par l’empreinte du certificat public récupéré.
+
+## Certificat de production disponible
+
+Le bootstrap [39764263507](https://github.com/Xdavius/NIX_SB/actions/runs/39764263507)
+a réussi après approbation. Les fichiers publics sont dans
+`certificates/production/GLF.pem` (vérification) et `GLF.cer` (enrôlement MOK).
+L’empreinte est consignée dans le README de ce dossier. GLF doit utiliser ces
+fichiers à une révision approuvée, pas le certificat GLF-TEST.
+La signature de production n’a pas encore été activée ni testée de bout en bout.
+Le bootstrap est refermé et son secret de jeton temporaire supprimé ; le
+propriétaire doit également révoquer ce jeton dans ses paramètres personnels GitHub.

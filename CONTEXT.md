@@ -104,3 +104,15 @@ GLF_KEY_ADMIN_TOKEN ; ne pas réutiliser/transférer l’authentification locale
 Le workflow doit être sur la branche par défaut : choix demandé à l’utilisateur.
 Aucune clé de production créée à ce stade. Récupération actuelle via client GitHub,
 non adaptée à une flotte anonyme sans service intermédiaire ; voir documentation.
+
+## Clé de production créée le 22 octobre 2026
+
+Bootstrap 39764263507 approuvé par l’utilisateur et terminé avec succès.
+Clé privée enregistrée dans glf-signing-production, jamais téléchargée.
+Certificat public récupéré dans certificates/production, PEM/DER et empreinte
+vérifiés : 633FDE4E911D1002BBD58B3945D02BC43F1B840E6F0D5C953B573E77A656BFBF.
+Rising est maintenant la branche par défaut et reste protégée.
+GLF_KEY_BOOTSTRAP_ENABLED remis à false ; secret temporaire GLF_KEY_ADMIN_TOKEN
+retiré du bootstrap. Révoquer aussi le jeton personnel côté compte GitHub.
+La signature de production reste désactivée jusqu’à sa validation dédiée ;
+aucune signature de poste réel ni modification GLF-OS effectuée.
