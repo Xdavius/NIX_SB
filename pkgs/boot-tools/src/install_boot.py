@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Install a verified shim -> systemd-boot -> signed kernel with a separate local initrd."""
+from boot_menu import menu_header
+
 import argparse
 import fcntl
 import hashlib
@@ -93,7 +95,7 @@ def install(config, target, allow_unmounted=False):
             atomic_copy(config["certificate"], esp / "EFI/GLF/GLF.pem")
             cmdline = " ".join([f"init={target}/init", *params])
             boot_entry = work / "entry.conf"
-            boot_entry.write_text(f"title GLF-OS {identifier}\nlinux /{directory}/kernel.efi\n"
+            boot_entry.write_text(menu_header(target) + f"linux /{directory}/kernel.efi\n"
                                   f"initrd /{directory}/initrd\noptions {cmdline}\n")
             atomic_copy(boot_entry, esp / "loader/entries" / entry)
             record = work / "generation.json"

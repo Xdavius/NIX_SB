@@ -323,3 +323,23 @@ NVIDIA, les périphériques de jeu et l’enrôlement firmware.
 
 Voir [VALIDATION](docs/VALIDATION.md), [CI](docs/CI.md) et
 [signature centralisée](docs/SIGNING-SERVICE.md).
+
+## Informations du menu de demarrage
+
+L'installateur lit le libelle de la generation cible dans `boot.json`
+(`org.nixos.bootspec.v1.label`, qui contient normalement les versions GLF-OS et
+du noyau). Il retrouve son numero et sa date dans les liens locaux
+`/nix/var/nix/profiles/system-N-link`, y compris lors d'un rollback.
+Le menu affiche `GLF-OS` et une description `Generation N <libelle>, built on AAAA-MM-JJ`.
+Si plusieurs numeros designent la meme fermeture, le plus grand est affiche.
+Sans profil correspondant, seul le libelle est affiche ; sans bootspec exploitable,
+le nom de la fermeture sert de secours. Aucun numero ni date n'est invente.
+Les identifiants des fichiers d'entree et les chemins du noyau/initrd restent stables.
+Aucune nouvelle metadonnee GLF-OS n'est requise. Les entrees existantes sont
+actualisees quand leur generation est reinstallee par le hook.
+
+Pour GLF-OS, le libelle est reconstruit avec `VERSION_CODENAME` du fichier
+`etc/os-release` de la generation cible et la version Linux du bootspec.
+Le nom de code NixOS (par exemple Zokor) n'est ainsi pas affiche ; le nom de
+version GLF (par exemple Rising) est conserve, y compris lors d'un rollback.
+Sans ces informations, le libelle du bootspec reste le secours.
