@@ -32,6 +32,9 @@ Les artefacts et releases portent le profil pour empêcher leur mélange :
 `profile`, `branch`, `commit`, `url`, `archiveHash` et `hash`. Le manifeste build.json trace le
 dépôt channels, son commit et les pins nixpkgs/unstable. La release reste draft
 jusqu’à la fin des uploads. Aucun remplacement automatique d’une release existante.
+Lors de sa publication, la CI marque explicitement la release « Latest » afin
+que `glf-update` découvre la nouvelle version. Ce statut est global au dépôt ;
+actuellement, seul le profil testing est publié.
 Les artefacts Actions expirent après sept jours, pas les assets de release.
 
 ## Actualisation contrôlée des pins
