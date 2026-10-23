@@ -237,6 +237,13 @@ ce qui conserve sa version lors d’un retour arrière.
 
 ## 4. Raccordement à glf-update
 
+La publication NIX_SB marque explicitement la nouvelle release « Latest » une
+fois tous ses fichiers téléversés. Si ce statut pointe encore vers une ancienne
+release, la correction se fait côté publication NIX_SB. Pour les postes déjà
+intégrés, il suffit ensuite de lancer `glf-update` ; aucun changement manuel de
+configuration utilisateur n’est nécessaire. Cela ne remplace pas l’épinglage du
+descripteur utilisé lors de l’évaluation Nix.
+
 ```nix
 environment.systemPackages = [ sb.boot-tools ];
 environment.etc."secureboot/GLF.pem".source =
