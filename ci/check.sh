@@ -11,6 +11,7 @@ flake_ref=${GLF_FLAKE_REF:-.}
 nix eval "$flake_ref#checks.x86_64-linux.${prefix}packages.drvPath" --no-update-lock-file
 python3 -m unittest discover -s tests -p 'test_catalogue.py'
 python3 -m unittest discover -s tests -p 'test_installer_config.py'
+python3 -m unittest discover -s tests -p 'test_boot_menu.py'
 python3 -m unittest discover -s tests -p 'test_bootstrap.py'
 # Petites fixtures PE seulement : aucun build noyau ni acces EFI/reseau de signature.
 python3 tests/test_boot.py

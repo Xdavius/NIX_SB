@@ -54,6 +54,7 @@ class BootTests(unittest.TestCase):
         self.assertEqual(len(list((self.esp / 'loader/entries').glob('*.conf'))), 2)
         self.assertIn(entry, (self.esp / 'loader/loader.conf').read_text())
         contents = (self.esp / 'loader/entries' / entry).read_text()
+        self.assertIn('title GLF-OS\nversion first\nsort-key glf-os\n', contents)
         self.assertIn(f'init={first}/init', contents)
         self.assertIn(f'initrd /EFI/GLF/generations/{identifier}/initrd', contents)
         self.assertEqual((self.esp / f'EFI/GLF/generations/{identifier}/initrd').read_bytes(), (first / 'initrd').read_bytes())
