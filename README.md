@@ -9,7 +9,7 @@ Ce dépôt centralise le choix du noyau nixpkgs, les définitions des drivers GL
 le catalogue de confiance et les outils de signature Secure Boot.
 
 - `kernel.json` : famille du noyau choisie dans nixpkgs (`linuxPackages_6_18`).
-- `flake.lock` : révisions de construction/test suivant les channels GLF-OS.
+- `flake.lock` : fichier local/CI temporaire, ignore par Git ; les versions viennent des channels GLF-OS.
 - `pkgs/drivers/catalogue.json` : les sept drivers externes GLF-OS et xonedo.
 - `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes, gérés ici.
 - `pkgs/drivers/hid-fanatecff` et `new-lg4ff` : vos définitions désormais maintenues ici.
@@ -38,6 +38,7 @@ Aucun fichier GLF-OS ni ancien dépôt de driver n’est modifié automatiquemen
 ## Vérifications légères
 
 ```sh
+nix flake update --flake "path:$PWD" --refresh
 nix flake check "path:$PWD" --no-build --no-update-lock-file
 python3 -m unittest discover -s tests -p test_catalogue.py
 ```

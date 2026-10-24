@@ -1,5 +1,7 @@
 name: GLF kernel and signed boot
 on:
+  schedule:
+    - cron: '23 5 * * *'
   pull_request:
   push:
     branches: ["**"]

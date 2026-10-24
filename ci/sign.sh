@@ -32,7 +32,7 @@ cp "$secret_dir/cert.pem" dist/signed/GLF.pem
 for file in shimx64.efi mmx64.efi release.json; do
   cp "dist/unsigned/$file" dist/signed/
 done
-for file in modules.cer bundle.sha256 approved-modules.json nix-closure.json store-paths.txt; do
+for file in modules.cer bundle.sha256 approved-modules.json nix-closure.json store-paths.txt flake.lock; do
   if [[ -f dist/unsigned/$file ]]; then cp "dist/unsigned/$file" dist/signed/; fi
 done
 (cd dist/signed && sha256sum ./* > SHA256SUMS)

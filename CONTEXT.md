@@ -197,6 +197,9 @@ sans prétendre que les tests précédents démontrent sa compatibilité avec GL
 Correction explicite de l’utilisateur : glf-update est responsable des mises
 à jour, pas glf-boot. Le guide raccorde donc glf-secureboot-install au parcours
 de glf-update après construction de la génération cible. Aucun code GLF-OS modifié.
+Précision explicite de l'utilisateur : glf-boot n'est pas un composant GLF-OS,
+mais un alias destiné à disparaître. glf-update est le seul updater ; ne prévoir
+aucune intégration dépendant de cet alias.
 
 
 ## Alignement CI demandé, réalisé avec blocage de compatibilité découvert
@@ -253,3 +256,40 @@ est refusé par Nix (fixed-output derivations must not reference store paths).
 Correction : descripteur v2 avec archiveHash, fetchurl de l’archive compressée,
 extraction et vérifications dans une dérivation normale. Le test embarque
 maintenant une référence réelle au store pour couvrir ce cas.
+
+## Channels mouvants — correction explicite de l'utilisateur
+
+L'utilisateur refuse un second lock versionne dans NIX_SB et les PR automatiques.
+flake.lock est supprime du depot et ignore. Les channels GLF main sont l'autorite.
+secureboot-release.yml recoit le cron quotidien 05:23 UTC ; resolution unique par parcours,
+lock temporaire transmis aux jobs et inclus dans l'archive de release.
+Les commandes Nix utilisent path:$PWD pour inclure le lock ignore.
+Le tag inclut les revisions du channel pour publier sans nouveau commit NIX_SB.
+La presence de cette release publique evite de reconstruire/signer/publier.
+Aucune PR ni commit automatique. Current reste explicitement indisponible.
+L'ancienne proposition watch-channels.yml/update-channels.sh est retiree.
+Changements locaux seulement : activation apres fusion sur la branche par defaut.
+Validation : resolution reelle des deux channels depuis un checkout sans lock,
+puis ci/check.sh complet reussi (evaluation testing, shellcheck, actionlint,
+16 tests unitaires, 4 tests d'installation, signature/archive/import Nix avec
+cle jetable). Tests de detection : absent, existant, draft, autre tag, erreur API.
+Aucun build noyau, workflow distant, secret de production ou publication.
+
+## Nom du workflow de publication
+
+Le chemin historique .github/workflows/uki.yml est remplace par
+.github/workflows/secureboot-release.yml. Les references precedentes a uki.yml
+dans cet historique designent cet ancien nom. La documentation active utilise
+le nouveau chemin ; le nom affiche et les identifiants de jobs sont conserves.
+Validation : actionlint et git diff --check reussis.
+
+## Retention automatique des releases
+
+Demande utilisateur : conserver 7 releases maximum. Nettoyage apres publication
+reussie via ci/prune_releases.py : 7 releases Secure Boot publiques au total,
+tous profils/branches confondus, triees par published_at/id. La nouvelle release
+est toujours preservee ; suppression des anciennes releases, assets et tags.
+Brouillons et autres formats de tags exclus. Job publish serialise globalement.
+Les anciens descripteurs peuvent perdre leur source de telechargement.
+Validation : 8 tests avec API simulee, shellcheck, actionlint et diff --check
+reussis. Aucun nettoyage distant execute ; activation apres fusion.
