@@ -5,7 +5,7 @@ n’est modifié par ce dépôt. Cible : x86_64, sans UKI et sans signature par 
 
 ## Organisation
 
-La chaîne est : **firmware → shim Rocky → systemd-boot signé GLF → noyau signé
+La chaîne est : **firmware → shim Rocky → rEFInd ou systemd-boot signé GLF → noyau signé
 GLF + initrd local**. Le noyau et le chargeur sont signés une fois dans la CI ;
 les postes téléchargent la même publication. L’initrd et les paramètres de
 démarrage ne sont pas authentifiés dans ce mode.
@@ -18,7 +18,7 @@ démarrage ne sont pas authentifiés dans ce mode.
 | Confiance des modules intégrée au noyau | NIX_SB : `sb.kernel` |
 | Shim et MokManager avec leurs signatures originales | `sb.rocky-shim` |
 | Certificat public GLF | `sb.secureboot-certificate` |
-| Signature du noyau et de systemd-boot | CI NIX_SB, clé privée dans GitHub |
+| Signature du noyau, de systemd-boot et de rEFInd | CI NIX_SB, clé privée dans GitHub |
 | Choix des pilotes, matériel, initrd, services | GLF-OS et `glf-apps` |
 | Mises à jour des générations | `glf-update` pilote la mise à jour et appelle `glf-secureboot-install` |
 | Installation des fichiers de démarrage signés | `glf-secureboot-install`, fourni par ce dépôt |
@@ -37,7 +37,7 @@ protégée, `GLF_SIGNING_ENABLED=true` et une branche autorisée dans l’enviro
 
 Chaque release publique contient :
 
-- `glf-secureboot.tar.gz` : noyau signé, systemd-boot signé, shim, MokManager,
+- `glf-secureboot.tar.gz` : noyau signé, systemd-boot signé, rEFInd signé, shim, MokManager,
   certificat GLF PEM/DER, certificats des modules et manifestes.
 - `release.json` : URL, `archiveHash` pour le téléchargement, hash NAR décompressé
   pour diagnostic, profil, branche et commit (format v2).
@@ -171,6 +171,50 @@ Sorties disponibles :
 Sans `signedReleaseFile`, `sb.signed` vaut `null` : aucun téléchargement implicite.
 Les paquets de construction non signés restent utilisables pour développer et
 pour la CI. Ce mécanisme n’est pas un cache binaire Nix des pilotes.
+
+## 1.3. Module intégré Secure Boot et multiboot
+
+Le raccordement recommandé utilise désormais [modules/multiboot.nix](modules/multiboot.nix).
+Dans les sorties de `glf-apps`, exposer le module depuis la source déjà déclarée :
+
+```nix
+nixosModules.glf-secureboot = "${nix-sb-source}/modules/multiboot.nix";
+```
+
+Dans la configuration GLF-OS, importer cette sortie puis activer :
+
+```nix
+imports = [ glf-apps.nixosModules.glf-secureboot ];
+glf.secureboot.enable = true;
+glf.multiboot = {
+  enable = true;
+  makeDefault = true;
+  timeout = 10;
+  configurationLimit = 10;
+};
+```
+
+Par défaut, le module active Secure Boot avec systemd-boot signé
+(`glf.secureboot.enable = true`) et laisse rEFInd désactivé
+(`glf.multiboot.enable = false`).
+
+Le module utilise `pkgs.glf-kernel-center` fourni par l’overlay ci-dessus.
+Il configure le noyau, les métadonnées par génération, les certificats et le hook
+`boot.loader.external`. Les raccordements manuels des sections 3 et 4 sont une
+alternative : ne pas les ajouter en doublon. Les choix de pilotes de la section 2
+restent à appliquer selon le matériel. Désactiver l’ancien module multiboot et
+Lanzaboote pour éviter les définitions et installateurs concurrents.
+
+`glf-update` reste le seul updater : son installation de génération déclenche
+le hook NixOS, qui régénère le menu. Une seule icône GLF ouvre la liste des
+générations ; les autres OS gardent leur entrée directe. La publication choisie
+doit contenir `refind_x64.efi` signé. Les anciennes archives restent utilisables
+sans multiboot.
+
+Pour revenir à systemd-boot, garder `glf.secureboot.enable = true` et passer
+`glf.multiboot.enable = false`, puis installer la nouvelle configuration.
+Voir [la migration multiboot](docs/MULTIBOOT.md) pour les assets repris,
+les protections de l’ESP et les commandes de nettoyage.
 
 ## 2. Noyau, pilotes et NVIDIA
 

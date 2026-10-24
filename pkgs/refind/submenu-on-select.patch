@@ -1,0 +1,36 @@
+--- a/refind/global.h
++++ b/refind/global.h
+@@ -298,6 +298,7 @@
+    EG_IMAGE    *Image;
+    EG_IMAGE    *BadgeImage;
+    struct _refit_menu_screen *SubScreen;
++   BOOLEAN     SubmenuOnSelect; // Explicit opt-in for a manual OS entry.
+ } REFIT_MENU_ENTRY;
+ 
+ typedef struct _refit_menu_screen {
+--- a/refind/config.c
++++ b/refind/config.c
+@@ -1031,6 +1031,9 @@
+             Entry->me.BadgeImage = BuiltinIcon(BUILTIN_ICON_VOL_EFI);
+             Entry->me.Tag = TAG_FIRMWARE_LOADER;
+ 
++        } else if (MyStriCmp(TokenList[0], L"submenu_on_select")) {
++            Entry->me.SubmenuOnSelect = (TokenCount == 1) || MyStriCmp(TokenList[1], L"true");
++
+         } else if (MyStriCmp(TokenList[0], L"submenuentry") && (TokenCount > 1)) {
+             AddSubmenu(Entry, File, CurrentVolume, TokenList[1]);
+             AddedSubmenu = TRUE;
+--- a/refind/menu.c
++++ b/refind/menu.c
+@@ -1830,6 +1830,11 @@
+         Screen->TimeoutSeconds = 0;
+ 
+         MenuTitle = StrDuplicate(TempChosenEntry->Title);
++        // Keep timeout boot and ordinary entries unchanged. Only an explicit
++        // selection of an opted-in entry opens its existing submenu.
++        if (MenuExit == MENU_EXIT_ENTER && TempChosenEntry->SubmenuOnSelect &&
++            TempChosenEntry->SubScreen != NULL)
++            MenuExit = MENU_EXIT_DETAILS;
+         if (MenuExit == MENU_EXIT_DETAILS) {
+             if (TempChosenEntry->SubScreen != NULL) {
+                LOG(3, LOG_LINE_NORMAL, L"About to call RunGenericMenu() on subscreen '%s'", MenuTitle);

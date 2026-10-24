@@ -22,7 +22,7 @@ openssl x509 -in "$secret_dir/cert.pem" -pubkey -noout > "$secret_dir/cert.pub"
 cmp -s "$secret_dir/key.pub" "$secret_dir/cert.pub" || { echo 'Cle et certificat incompatibles' >&2; exit 1; }
 (cd dist/unsigned && sha256sum --check SHA256SUMS)
 mkdir -p dist/signed
-for file in kernel.efi systemd-bootx64.efi; do
+for file in kernel.efi systemd-bootx64.efi refind_x64.efi; do
   sbsign --key "$secret_dir/key.pem" --cert "$secret_dir/cert.pem" \
     --output "dist/signed/$file" "dist/unsigned/$file"
   sbverify --cert "$secret_dir/cert.pem" "dist/signed/$file"

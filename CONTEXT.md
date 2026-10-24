@@ -293,3 +293,62 @@ Brouillons et autres formats de tags exclus. Job publish serialise globalement.
 Les anciens descripteurs peuvent perdre leur source de telechargement.
 Validation : 8 tests avec API simulee, shellcheck, actionlint et diff --check
 reussis. Aucun nettoyage distant execute ; activation apres fusion.
+
+## Essai rEFInd avec sous-menu sur validation
+
+Les changements CI precedents sont dans le commit 1c7a541 et la PR GitHub #9.
+Branche d'essai actuelle : experiment/refind-generation-submenu.
+L'utilisateur demande de reutiliser son multiboot/assets depuis
+/etc/nixos/customConfig/secureboot-multiboot et d'ouvrir les generations avec
+Entree sur l'icone GLF. Lecture seule du dossier fourni, copie des deux assets
+dans experiments/refind/assets ; aucune modification du systeme hote.
+
+Prototype pkgs/refind-experiment : rEFInd 0.14.2 amont avec option locale
+submenu_on_select true, sources/hash fixes. Compilation TianoCore EDK2,
+SDK historique 201903 (interfaces IntelFramework) et BaseTools du channel.
+Compatibilite GCC/GCC5, stack protector desactive faute de runtime historique,
+sections PE/SBAT alignees a 4096 pour les protections memoire de shim.
+Sortie testing-refind-experiment uniquement experimentale, non branchee sur
+la publication ou l'installateur de production. Voir experiments/refind/README.md.
+
+Validation reelle : build via la flake testing reussi ; deux parcours VM avec
+cle MOK jetable et shim Rocky reussis sur le binaire final (BaseTools 202608).
+Entree ouvre le sous-menu, Echap revient, l'entree fictive generation 41 demarre ;
+une autre entree sans option conserve le demarrage direct. Secure Boot=1,
+lockdown integrity, pilotes xonedo charges, module altere rejete. Deux entrees
+de test avec le meme noyau/initrd et des parametres distincts : pas encore un
+rollback entre deux systemes GLF-OS complets. Captures dist/refind-preview et
+journaux dist/uefi-xonedo-refind[-other]-serial.log. Aucun secret de production.
+Integration des vraies generations, installation, publication signee de rEFInd
+et validation materielle restent a faire ; modifications non committées.
+
+## 2026-10-24 — intégration du module multiboot existant
+
+Sur `experiment/refind-generation-submenu`, le prototype devient `pkgs/refind`
+et est intégré à la construction/signature de release (troisième image signée).
+`modules/multiboot.nix` expose glf.secureboot et glf.multiboot, utilise le packageSet
+de glf-apps et le hook NixOS par génération. `glf-update` reste le seul updater.
+Assets d’origine copiés dans pkgs/multiboot-assets ; module /etc/nixos inchangé.
+Le nouvel outil glf-multiboot conserve installation/retrait, découverte firmware,
+identités OS, respect canTouchEfiVariables, makeDefault et nettoyages ciblés.
+Les installations non marquées sont protégées. Les générations sont sélectionnées
+sur leurs fichiers installés et closures disponibles ; limite d’affichage sans
+suppression. Retour vers systemd-boot en désactivant seulement glf.multiboot.
+
+Validation : contrôles testing-ci, signatures/import archive et module NixOS
+passent. VM avec le véritable installateur : deux fixtures 41/42, menu graphique,
+Entrée/Échap/sélection de 41, Secure Boot et lockdown actifs, module altéré refusé.
+Correction importante : chemins EFI avec antislash dans les sous-menus rEFInd,
+assets absolus depuis EFI/BOOT. Guide et migration : docs/MULTIBOOT.md.
+Pas de test matériel ni rollback entre deux systèmes GLF complets ; SDK EDK2
+historique à réévaluer avant déploiement. Aucun commit/push de cette intégration
+ni installation sur l’hôte à ce stade.
+
+Fond multiboot : source SVG vectorisée à partir du PNG fourni, fond #2f302f
+et texte/logo conservés sous forme de contours (reconstruction approximative).
+Le paquet multiboot-assets génère au build un PNG 1920x1080 RGB8 opaque,
+non entrelacé, compression sans perte et sans métadonnées (~28 ko).
+Le PNG original reste une référence et l’icône du menu est inchangée.
+Validation VMware encore nécessaire ; la compression ne réduit pas le tampon
+image décodé. Secure Boot est maintenant activé par défaut dans le module,
+multiboot reste false ; évaluation Nix des défauts et opt-out réussie.
