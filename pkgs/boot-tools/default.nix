@@ -1,7 +1,7 @@
-{ lib, stdenvNoCC, makeWrapper, python3, sbsigntool, systemd, util-linux, efibootmgr }:
+{ lib, stdenvNoCC, makeWrapper, python3, sbsigntool, systemd, util-linux, efibootmgr, multibootAssets }:
 stdenvNoCC.mkDerivation {
   pname = "glf-secureboot";
-  version = "0.3.0";
+  version = "0.4.0";
   src = ./src;
   nativeBuildInputs = [ makeWrapper ];
   dontBuild = true;
@@ -12,6 +12,11 @@ stdenvNoCC.mkDerivation {
     makeWrapper ${python3}/bin/python3 "$out/bin/glf-secureboot-install" \
       --add-flags "$out/lib/glf-secureboot/install_boot.py" \
       --prefix PATH : ${lib.makeBinPath [ sbsigntool systemd util-linux efibootmgr ]}
+    makeWrapper ${python3}/bin/python3 "$out/bin/glf-multiboot" \
+      --add-flags "$out/lib/glf-secureboot/multiboot.py" \
+      --prefix PATH : ${lib.makeBinPath [ sbsigntool systemd util-linux efibootmgr ]} \
+      --set GLF_MULTIBOOT_ASSETS ${multibootAssets}
+    wrapProgram "$out/bin/glf-secureboot-install" --set GLF_MULTIBOOT_ASSETS ${multibootAssets}
     runHook postInstall
   '';
   meta.description = "Installation du noyau signe GLF avec initrd local";

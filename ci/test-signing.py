@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     os.chdir(temp)
     unsigned = Path("dist/unsigned")
     unsigned.mkdir(parents=True)
-    for name in ("kernel.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi"):
+    for name in ("kernel.efi", "refind_x64.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi"):
         shutil.copyfile(stub, unsigned / name)
     (unsigned / "release.json").write_text(json.dumps({"commit": "a" * 40, "branch": "Rising", "profile": "current", "channels": {"commit": "b" * 40}}))
     (unsigned / "modules.cer").write_bytes(b"fixture-certificates")
@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     (unsigned / "store-paths.txt").write_text(str(stub) + "\n")
     hashes = "".join(
         f"{hashlib.sha256((unsigned / name).read_bytes()).hexdigest()}  {name}\n"
-        for name in ("kernel.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi", "modules.cer", "bundle.sha256")
+        for name in ("kernel.efi", "refind_x64.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi", "modules.cer", "bundle.sha256")
     )
     (unsigned / "SHA256SUMS").write_text(hashes)
     run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
@@ -77,8 +77,9 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     (fixture / 'certificates/production').mkdir(parents=True)
     shutil.copyfile('dist/signed/GLF.pem', fixture / 'certificates/production/GLF.pem')
     shutil.copyfile('dist/signed/GLF.cer', fixture / 'certificates/production/GLF.cer')
-    for directory in ('kernel', 'systemd/lib/systemd/boot/efi', 'shim/share/efi'):
+    for directory in ('kernel', 'systemd/lib/systemd/boot/efi', 'shim/share/efi', 'refind/share/efi'):
         (fixture / directory).mkdir(parents=True)
+    shutil.copyfile(stub, fixture / 'refind/share/efi/refind_x64.efi')
     shutil.copyfile(stub, fixture / 'kernel/bzImage')
     shutil.copyfile(stub, fixture / 'systemd/lib/systemd/boot/efi/systemd-bootx64.efi')
     for name in ('shimx64.efi', 'mmx64.efi'):
@@ -95,6 +96,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     fetchurl = args: pkgs.fetchurl (args // {{ url = "file://${{./archive.tar.gz}}"; }});
     kernel = {{ outPath = builtins.path {{ path = ./kernel; }}; version = "fixture"; }};
     systemd = ./systemd;
+    refind = ./refind;
     rockyShim = ./shim;
   }};
 in signed.bundle

@@ -14,6 +14,7 @@ le catalogue de confiance et les outils de signature Secure Boot.
 - `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes, gérés ici.
 - `pkgs/drivers/hid-fanatecff` et `new-lg4ff` : vos définitions désormais maintenues ici.
 - `pkgs/kernel` : sélection du noyau et production de son image enrichie des certificats.
+- `modules/multiboot.nix` : intégration NixOS, menu rEFInd GLF et générations en sous-menu ([guide](docs/MULTIBOOT.md)).
 - `pkgs/boot-tools` et `.github/workflows` : installation sans UKI, publication signée et bootstrap de clé.
 
 ```nix

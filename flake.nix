@@ -41,7 +41,7 @@
     in {
       legacyPackages.${system} = sb;
       packages.${system} = {
-        inherit (sb) kernel certificates boot-tools rocky-shim secureboot-certificate nvidia;
+        inherit (sb) kernel certificates boot-tools rocky-shim secureboot-certificate nvidia refind multiboot-assets;
         base-kernel = sb.kernelPackages.kernel;
         modules-tree = sb.modulesTree;
         default = sb.kernel;
@@ -53,7 +53,10 @@
         enrollment = pkgs.callPackage ./tests/fixtures/enrollment.nix { rockyShim = sb.rocky-shim; };
       } // sb.drivers;
       nixosConfigurations.prototype = target;
-      checks.${system}.packages = import ./tests/packages.nix { inherit pkgs sb target; };
+      checks.${system} = {
+        packages = import ./tests/packages.nix { inherit pkgs sb target; };
+        multiboot-module = import ./tests/multiboot-module.nix { inherit pkgs sb; };
+      };
       devShells.${system} = {
         ci = pkgs.mkShell (testEnvironment // {
           packages = with pkgs; [ bash coreutils gh openssl sbsigntool jq shellcheck python3 actionlint binutils ];

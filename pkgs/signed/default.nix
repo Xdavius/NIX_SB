@@ -1,5 +1,5 @@
 { lib, fetchurl, runCommand, python3, openssl, sbsigntool, jq
-, kernel, systemd, rockyShim, releaseFile }:
+, kernel, systemd, refind, rockyShim, releaseFile }:
 let
   release = builtins.fromJSON (builtins.readFile releaseFile);
   valid = release.version == 2
@@ -29,11 +29,17 @@ let
     for file in kernel.efi systemd-bootx64.efi; do
       sbverify --cert ${../../certificates/production/GLF.pem} "$file"
     done
+    if test -f refind_x64.efi; then
+      sbverify --cert ${../../certificates/production/GLF.pem} refind_x64.efi
+    fi
     cmp shimx64.efi ${rockyShim}/share/efi/shimx64.efi
     cmp mmx64.efi ${rockyShim}/share/efi/mmx64.efi
     export PYTHONPATH=${../boot-tools/src}
     python3 - <<'PY'
 from signing_protocol import pe_content
+from pathlib import Path
+if Path('refind_x64.efi').exists():
+    assert pe_content('refind_x64.efi') == pe_content('${refind}/share/efi/refind_x64.efi'), 'rEFInd incompatible'
 assert pe_content('kernel.efi') == pe_content('${kernel}/bzImage'), 'Noyau incompatible avec cette revision'
 assert pe_content('systemd-bootx64.efi') == pe_content('${systemd}/lib/systemd/boot/efi/systemd-bootx64.efi'), 'Chargeur incompatible'
 PY
@@ -43,6 +49,11 @@ in {
   kernel = runCommand "glf-kernel-signed-${kernel.version}" {} ''
     mkdir -p "$out"
     ln -s ${bundle}/kernel.efi "$out/bzImage"
+  '';
+  refind = runCommand "glf-refind-signed-${release.commit}" {} ''
+    test -f ${bundle}/refind_x64.efi
+    mkdir -p "$out/share/efi"
+    ln -s ${bundle}/refind_x64.efi "$out/share/efi/refind_x64.efi"
   '';
   bootloader = runCommand "glf-bootloader-signed-${release.commit}" {} ''
     mkdir -p "$out/share/efi"

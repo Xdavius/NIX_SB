@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Install a verified shim -> systemd-boot -> signed kernel with a separate local initrd."""
 from boot_menu import menu_header
+import multiboot
 
 import argparse
 import fcntl
@@ -35,9 +36,25 @@ def atomic_copy(source, destination):
             os.unlink(tmp)
 
 
+def validate_esp(config, allow_unmounted=False):
+    if allow_unmounted and config['canTouchEfiVariables']:
+        raise ValueError('Pas de modifications EFI avec --allow-unmounted')
+    esp = Path(config['esp'])
+    if not allow_unmounted:
+        info = json.loads(subprocess.check_output(
+            ['findmnt', '--json', '--mountpoint', str(esp), '--output', 'TARGET,FSTYPE,SOURCE'], text=True))
+        if info['filesystems'][0]['fstype'] != 'vfat':
+            raise ValueError("L'ESP doit etre une partition FAT montee")
+    return esp
+
+
 def install(config, target, allow_unmounted=False):
     if "signerCommand" in config:
         raise ValueError("signerCommand retire : fournir signedBundle dans les metadonnees v2")
+    cfg = multiboot.settings(config)
+    for flag in ('canTouchEfiVariables', 'installFallback'):
+        if flag in config and type(config[flag]) is not bool:
+            raise ValueError(flag + ' doit etre un booleen')
     target = Path(target).resolve(strict=True)
     if not (target / "init").is_file():
         raise ValueError("Generation NixOS sans init")
@@ -61,7 +78,8 @@ def install(config, target, allow_unmounted=False):
     if not timeout.isdecimal():
         raise ValueError("timeout doit etre un entier positif ou nul")
     # No network or signing operation: only already-published components.
-    for name in ("kernel.efi", "systemd-bootx64.efi"):
+    images = ["kernel.efi", "systemd-bootx64.efi"] + (["refind_x64.efi"] if cfg["enable"] else [])
+    for name in images:
         run("sbverify", "--cert", config["certificate"], bundle / name)
     if pe_content(metadata["kernel"]) != pe_content(bundle / "kernel.efi"):
         raise ValueError("Le noyau signe ne correspond pas a cette generation")
@@ -71,12 +89,22 @@ def install(config, target, allow_unmounted=False):
     for name in ("shimx64.efi", "mmx64.efi"):
         if not (bundle / name).is_file():
             raise ValueError("Publication incomplete : " + name)
-    esp = Path(config["esp"])
-    if not allow_unmounted:
-        info = json.loads(subprocess.check_output(
-            ["findmnt", "--json", "--mountpoint", str(esp), "--output", "TARGET,FSTYPE,SOURCE"], text=True))
-        if info["filesystems"][0]["fstype"] != "vfat":
-            raise ValueError("L'ESP doit etre une partition FAT montee")
+    esp = validate_esp(config, allow_unmounted)
+    refind_dir = esp / 'EFI/refind'
+    was_multiboot = (refind_dir / '.glf-managed').is_file()
+    if cfg['enable'] or was_multiboot:
+        multiboot.managed(refind_dir)
+    if cfg['enable']:
+        assets = Path(os.environ.get('GLF_MULTIBOOT_ASSETS', '/nonexistent'))
+        if not all((assets / name).is_file() for name in
+                   ('themes/glfos/glf-bootloader.png', 'themes/glfos/glfos.png')):
+            raise ValueError('Assets multiboot absents')
+        fallback = esp / 'EFI/BOOT'
+        if config.get('installFallback', True) and fallback.exists() and any(fallback.iterdir()):
+            multiboot.managed(fallback)
+    state = None
+    if not allow_unmounted and (config['canTouchEfiVariables'] or Path('/sys/firmware/efi/efivars').is_dir()):
+        state = multiboot.firmware_state(esp)
     esp.mkdir(parents=True, exist_ok=True)
     identifier = hashlib.sha256(str(target).encode()).hexdigest()[:32]
     entry = f"glf-{identifier}.conf"
@@ -87,10 +115,18 @@ def install(config, target, allow_unmounted=False):
             work = Path(temporary)
             atomic_copy(bundle / "kernel.efi", esp / directory / "kernel.efi")
             atomic_copy(initrd, esp / directory / "initrd")
-            for bootdir, shim_name in (("EFI/GLF", "shimx64.efi"), ("EFI/BOOT", "BOOTX64.EFI")):
+            bootdirs = [("EFI/GLF", "shimx64.efi")]
+            if config.get('installFallback', True):
+                bootdirs.append(("EFI/BOOT", "BOOTX64.EFI"))
+            for bootdir, shim_name in bootdirs:
                 atomic_copy(bundle / "mmx64.efi", esp / bootdir / "mmx64.efi")
-                atomic_copy(bundle / "systemd-bootx64.efi", esp / bootdir / "grubx64.efi")
+                loader_name = ('refind_x64.efi' if bootdir == 'EFI/BOOT' and cfg['enable']
+                               and cfg['makeDefault'] else 'systemd-bootx64.efi')
+                atomic_copy(bundle / loader_name, esp / bootdir / "grubx64.efi")
                 atomic_copy(bundle / "shimx64.efi", esp / bootdir / shim_name)
+                marker = work / 'marker'
+                marker.write_text('Managed by GLF-OS secure boot installer\n')
+                atomic_copy(marker, esp / bootdir / '.glf-managed')
             atomic_copy(bundle / "systemd-bootx64.efi", esp / "EFI/systemd/systemd-bootx64.efi")
             atomic_copy(config["certificate"], esp / "EFI/GLF/GLF.pem")
             cmdline = " ".join([f"init={target}/init", *params])
@@ -106,16 +142,20 @@ def install(config, target, allow_unmounted=False):
             loader = work / "loader.conf"
             loader.write_text(f"default {entry}\ntimeout {timeout}\neditor no\nauto-entries yes\nsecure-boot-enroll off\n")
             atomic_copy(loader, esp / "loader/loader.conf")
-            if config["canTouchEfiVariables"]:
-                source = subprocess.check_output(["findmnt", "-n", "-o", "SOURCE", "--mountpoint", str(esp)], text=True).strip()
-                block = json.loads(subprocess.check_output(["lsblk", "--json", "--output", "PKNAME,PARTN", source], text=True))["blockdevices"][0]
-                if not block["pkname"] or not block["partn"]:
-                    raise ValueError("Impossible de determiner le disque/partition ESP")
-                entries = subprocess.check_output(["efibootmgr", "--verbose"], text=True)
-                if "\\EFI\\GLF\\shimx64.efi".lower() not in entries.lower():
-                    run("efibootmgr", "--create", "--disk", "/dev/" + block["pkname"], "--part", str(block["partn"]),
-                        "--label", "GLF-OS shim", "--loader", "\\EFI\\GLF\\shimx64.efi")
-                run("bootctl", "--esp-path=" + str(esp), "set-default", entry)
+            if cfg['enable']:
+                multiboot.install_menu(esp, bundle, config, identifier, state, atomic_copy)
+                if config.get('installFallback', True) and cfg['makeDefault']:
+                    atomic_copy(esp / 'EFI/refind/refind.conf', esp / 'EFI/BOOT/refind.conf')
+            if config['canTouchEfiVariables']:
+                multiboot.configure_firmware(state, cfg['enable'], cfg['makeDefault'] if cfg['enable'] else was_multiboot,
+                                            remove_refind=was_multiboot)
+                if not cfg['enable']:
+                    run('bootctl', '--esp-path=' + str(esp), 'set-default', entry)
+            if not cfg['enable'] and was_multiboot:
+                multiboot.remove_menu(esp)
+                if config.get('installFallback', True):
+                    (esp / 'EFI/BOOT/refind.conf').unlink(missing_ok=True)
+            multiboot.cleanup(esp)
             print(f"Generation installee : {entry}. Noyau signe et initrd local separe.")
 
 

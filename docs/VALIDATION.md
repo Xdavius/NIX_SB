@@ -133,3 +133,23 @@ Validations locales effectuées avec une clé jetable :
 Aucune publication distante de cette nouvelle chaîne n’a encore été exécutée.
 Le test historique à trois images n’est pas présenté comme une validation de
 ce nouveau workflow. Le certificat de production n’a pas été modifié.
+
+## Intégration multiboot — 24 octobre 2026
+
+- Construction de `testing-refind` et `testing-boot-tools` réussie.
+- `GLF_CHANNEL=testing bash ci/check.sh` dans `testing-ci` : succès ; 43 tests
+  Python, évaluations des paquets et du module activé/désactivé, shellcheck,
+  actionlint et signature/archive/import Nix avec clés jetables.
+- VM `GLF_VM_INSTALLER=.../glf-secureboot-install`, variante xonedo : menu issu
+  de deux installations réelles de fixtures 41/42 sur ESP temporaire. Une seule
+  entrée GLF, sous-menu graphique, retour puis sélection de 41 réussis.
+- Démarrage via shim et rEFInd signés, Secure Boot=1, lockdown integrity,
+  pilotes chargés et module altéré refusé. Les chemins rEFInd utilisent les
+  séparateurs EFI, y compris dans les sous-menus ; les assets sont accessibles
+  aussi depuis le chemin de secours `EFI/BOOT`.
+- Captures : `dist/refind-preview/02-generations.ppm` ; série :
+  `dist/uefi-xonedo-refind-serial.log` (non versionnés).
+
+Ces générations partagent le noyau/initrd de test et ne sont pas deux systèmes
+GLF-OS complets. La validation sur firmware physique et le rollback complet
+restent à effectuer. Aucun démarrage de l’hôte n’a été modifié.

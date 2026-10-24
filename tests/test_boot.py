@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'pkgs/boot-tools/src'))
 from install_boot import install
@@ -89,6 +90,69 @@ class BootTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 install(self.config, target, allow_unmounted=True)
             self.assertFalse(self.esp.exists())
+
+
+class MultibootTests(BootTests):
+    def setUp(self):
+        super().setUp()
+        self.config['multiboot'] = {'enable': True, 'configurationLimit': 2}
+        shutil.copyfile(self.bundle / 'systemd-bootx64.efi', self.bundle / 'refind_x64.efi')
+        assets = self.root / 'assets'
+        (assets / 'themes/glfos').mkdir(parents=True)
+        for file in ('glfos.png', 'glf-bootloader.png'):
+            (assets / 'themes/glfos' / file).write_bytes(b'fixture')
+        self.addCleanup(patch.stopall)
+        patch.dict(os.environ, {'GLF_MULTIBOOT_ASSETS': str(assets)}).start()
+
+    def test_generations_disable_and_unrelated_files(self):
+        first, second, third = [self.target(n) for n in ('first', 'second', 'third')]
+        for target in (first, second, third, first):
+            install(self.config, target, allow_unmounted=True)
+        menu = (self.esp / 'EFI/refind/refind.conf').read_text()
+        self.assertEqual(menu.count('menuentry "GLF-OS"'), 1)
+        self.assertEqual(menu.count('submenuentry '), 2)
+        self.assertIn('submenu_on_select true', menu)
+        self.assertIn(f'init={first}/init', menu)
+        self.assertEqual((self.esp / 'EFI/BOOT/refind.conf').read_text(), menu)
+        unrelated = self.esp / 'EFI/ubuntu/shimx64.efi'
+        unrelated.parent.mkdir()
+        unrelated.write_bytes(b'other OS')
+        config = {**self.config, 'multiboot': {'enable': False}}
+        install(config, first, allow_unmounted=True)
+        self.assertFalse((self.esp / 'EFI/refind').exists())
+        self.assertEqual(unrelated.read_bytes(), b'other OS')
+        self.assertEqual((self.esp / 'EFI/BOOT/grubx64.efi').read_bytes(),
+                         (self.bundle / 'systemd-bootx64.efi').read_bytes())
+        self.assertEqual(len(list((self.esp / 'EFI/GLF/generations').iterdir())), 3)
+
+    def test_unmanaged_refind_preserved(self):
+        (self.esp / 'EFI/refind').mkdir(parents=True)
+        (self.esp / 'EFI/refind/refind.conf').write_text('foreign')
+        with self.assertRaisesRegex(ValueError, 'non geree'):
+            install(self.config, self.target('first'), allow_unmounted=True)
+        self.assertEqual((self.esp / 'EFI/refind/refind.conf').read_text(), 'foreign')
+        self.assertFalse((self.esp / 'EFI/GLF').exists())
+
+    def test_unmanaged_fallback_preserved(self):
+        (self.esp / 'EFI/BOOT').mkdir(parents=True)
+        (self.esp / 'EFI/BOOT/BOOTX64.EFI').write_bytes(b'foreign')
+        with self.assertRaisesRegex(ValueError, 'non geree'):
+            install(self.config, self.target('first'), allow_unmounted=True)
+        self.assertEqual((self.esp / 'EFI/BOOT/BOOTX64.EFI').read_bytes(), b'foreign')
+
+    def test_invalid_refind_signature_preserves_esp(self):
+        data = bytearray((self.bundle / 'refind_x64.efi').read_bytes())
+        data[0x20] ^= 1
+        (self.bundle / 'refind_x64.efi').write_bytes(data)
+        with self.assertRaises(subprocess.CalledProcessError):
+            install(self.config, self.target('first'), allow_unmounted=True)
+        self.assertFalse(self.esp.exists())
+
+    def test_no_nvram_calls_in_simulation(self):
+        with patch('multiboot.firmware_state') as state, patch('multiboot.configure_firmware') as configure:
+            install(self.config, self.target('first'), allow_unmounted=True)
+        state.assert_not_called()
+        configure.assert_not_called()
 
 
 if __name__ == '__main__':

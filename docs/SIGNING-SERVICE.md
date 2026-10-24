@@ -5,9 +5,9 @@ et construit et publie les composants Secure Boot **sans UKI**. Le workflow de d
 `sign-request.yml` et le client `glf-secureboot-sign` sont retirés.
 
 1. `validate` effectue les contrôles et tests locaux avec clé jetable.
-2. `build` construit noyau enrichi, certificats, systemd-boot et shim Rocky.
-3. `sign` vérifie les empreintes puis signe uniquement `kernel.efi` et
-   `systemd-bootx64.efi` avec les secrets de `glf-signing-production`.
+2. `build` construit noyau enrichi, certificats, systemd-boot, rEFInd et shim Rocky.
+3. `sign` vérifie les empreintes puis signe `kernel.efi`,
+   `systemd-bootx64.efi` et `refind_x64.efi` avec les secrets de `glf-signing-production`.
 4. `publish` publie l’archive et son descripteur Nix dans une release identifiée par le commit et les révisions du channel,
    avec `contents: write`, mais sans accès à la clé privée.
 
