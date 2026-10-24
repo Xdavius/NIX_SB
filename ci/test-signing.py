@@ -27,10 +27,11 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     unsigned.mkdir(parents=True)
     for name in ("kernel.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi"):
         shutil.copyfile(stub, unsigned / name)
-    (unsigned / "release.json").write_text(json.dumps({"commit": "a" * 40, "branch": "Rising", "profile": "current"}))
+    (unsigned / "release.json").write_text(json.dumps({"commit": "a" * 40, "branch": "Rising", "profile": "current", "channels": {"commit": "b" * 40}}))
     (unsigned / "modules.cer").write_bytes(b"fixture-certificates")
     (unsigned / "bundle.sha256").write_text("fixture\n")
     (unsigned / "nix-closure.json").write_text("{}")
+    (unsigned / "flake.lock").write_text('{"fixture": true}\n')
     # Include real store references: an unpacked fixed-output fetch must fail.
     (unsigned / "store-paths.txt").write_text(str(stub) + "\n")
     hashes = "".join(
@@ -65,6 +66,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     assert descriptor['commit'] == 'a' * 40
     Path('unpacked').mkdir()
     run(['tar', '-xzf', 'dist/release/glf-secureboot.tar.gz', '-C', 'unpacked'])
+    assert Path('unpacked/flake.lock').read_bytes() == (unsigned / 'flake.lock').read_bytes()
     assert run(['nix', 'hash', 'path', 'unpacked']).strip() == descriptor['hash']
     # Build the actual package expression in an isolated tree with a disposable
     # trusted certificate. Production certificate files are never modified.

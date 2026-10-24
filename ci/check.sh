@@ -7,9 +7,12 @@ actionlint
 profile=${GLF_CHANNEL:-current}
 case "$profile" in current) prefix="" ;; testing) prefix="testing-" ;; *) exit 1 ;; esac
 python3 ci/channels.py --profile "$profile"
-flake_ref=${GLF_FLAKE_REF:-.}
+flake_ref=${GLF_FLAKE_REF:-path:$PWD}
 nix eval "$flake_ref#checks.x86_64-linux.${prefix}packages.drvPath" --no-update-lock-file
 python3 -m unittest discover -s tests -p 'test_catalogue.py'
+python3 -m unittest discover -s tests -p 'test_release_tag.py'
+python3 -m unittest discover -s tests -p 'test_release_needed.py'
+python3 -m unittest discover -s tests -p 'test_prune_releases.py'
 python3 -m unittest discover -s tests -p 'test_installer_config.py'
 python3 -m unittest discover -s tests -p 'test_boot_menu.py'
 python3 -m unittest discover -s tests -p 'test_bootstrap.py'

@@ -8,9 +8,8 @@ branch=$(jq -r .branch dist/signed/release.json)
 profile=$(jq -r .profile dist/signed/release.json)
 [[ $profile == current || $profile == testing ]] || exit 1
 [[ $commit =~ ^[a-f0-9]{40}$ ]] || exit 1
-# Le SHA identifie le contenu ; le hash du nom de branche evite les collisions.
-branch_hash=$(printf '%s' "$branch" | sha256sum | cut -c1-12)
-tag="secureboot-${profile}-${branch_hash}-${commit}"
+# Les channels peuvent changer sans nouveau commit NIX_SB.
+tag=$(python3 "$(dirname "$0")/release_tag.py" dist/signed/release.json)
 mkdir -p dist/release
 cp dist/signed/release.json dist/release/build.json
 hash=$(nix hash path dist/signed)

@@ -23,8 +23,9 @@ démarrage ne sont pas authentifiés dans ce mode.
 | Mises à jour des générations | `glf-update` pilote la mise à jour et appelle `glf-secureboot-install` |
 | Installation des fichiers de démarrage signés | `glf-secureboot-install`, fourni par ce dépôt |
 
-`glf-boot` reste le composant existant de GLF-OS ; la responsabilité des mises
-à jour appartient à `glf-update`. Ce dépôt fournit le paquet
+`glf-update` est le seul updater de GLF-OS. `glf-boot` est un alias destiné à
+disparaître, pas un composant distinct ; aucun raccordement ne doit en dépendre.
+Ce dépôt fournit le paquet
 `glf-secureboot`, dont la commande d’installation ne demande aucun jeton GitHub.
 Le client `glf-secureboot-sign` et son workflow de demandes sont supprimés.
 
@@ -42,11 +43,14 @@ Chaque release publique contient :
   pour diagnostic, profil, branche et commit (format v2).
 - `build.json` : versions et révisions de la construction.
 
-Le tag contient le profil, le hash du nom de branche et le commit complet. La publication
+Le tag contient le profil, le hash du nom de branche, le commit complet et
+l’empreinte des revisions du channel. La publication
 refuse de remplacer une release existante. Le descripteur et son hash sont à
 approuver dans GLF-OS ; ne pas récupérer implicitement une URL `latest` à chaque
-évaluation. Les releases ne dépendent pas de la rétention de sept jours des
-artefacts temporaires Actions, mais un administrateur peut toujours les supprimer.
+évaluation. Apres chaque publication reussie, seules les 7 dernieres releases Secure Boot
+publiees sont conservees au total, avec suppression des anciennes releases,
+assets et tags. Cette limite est distincte des sept jours de retention des
+artefacts temporaires Actions.
 
 ## 1.1. Source référencée exclusivement dans glf-apps
 
@@ -67,8 +71,8 @@ inputs.nix-sb-source = {
 
 Le lock qui résout la sous-flake `glf-apps` fixe le commit source. Après publication,
 versionner son descripteur dans `modules/glf-apps/secureboot/release.json` et
-épingler le même commit que `release.json.commit`. Aucune publication sans UKI
-n’est disponible tant que la refonte n’a pas été fusionnée et exécutée en CI.
+épingler le même commit que `release.json.commit`. Les revisions exactes des channels utilisees sont disponibles dans `build.json`
+et le lock temporaire inclus dans l’archive de la release.
 
 Dans l’overlay existant de `glf-apps`, ajouter les attributs suivants en rendant
 `nix-sb-source` accessible depuis les arguments `outputs` de la sous-flake :
@@ -138,7 +142,7 @@ même profil dans glf-apps. Le commit source NIX_SB peut être commun aux deux,
 mais les publications signées ne sont pas interchangeables.
 
 La CI utilise le nixpkgs de chaque profil pour noyau, pilotes et chargeur.
-Les pins actuellement verrouillés sont :
+Les derniers pins documentés avant le passage aux channels mouvants étaient :
 
 - current : channels `dc9d3bd`, nixpkgs `26f4107`, unstable `55bfb4d` ;
 - testing : channels `dbb24ff`, nixpkgs `02c087f`, unstable `9fbb54b`.
@@ -307,6 +311,14 @@ binaires de `rocky-shim` et le certificat de `secureboot-certificate` pour
 préparer le support de production GLF-OS.
 
 ## 6. Mise à jour et validation
+
+NIX_SB surveille les deux channels chaque jour a 05:23 UTC via
+`secureboot-release.yml`. Les revisions des channels sont resolues au lancement, sans lock
+versionne dans NIX_SB. Un changement testing declenche automatiquement les
+controles, la construction et la publication, sans PR. Le lock temporaire est
+conserve dans l’archive de la release.
+La surveillance ne reactive pas current et ne modifie pas les locks GLF-OS.
+Voir [la configuration et les conditions d'activation](docs/CI.md#channels-mouvants-sans-lock-versionne).
 
 Pour chaque version GLF-OS : branche NIX_SB protégée et autorisée dans
 l’environnement de signature. Publier après la CI, puis mettre à jour ensemble

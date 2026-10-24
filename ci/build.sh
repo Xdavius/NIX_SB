@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-flake_ref=${GLF_FLAKE_REF:-.}
+flake_ref=${GLF_FLAKE_REF:-path:$PWD}
 profile=${GLF_CHANNEL:-current}
 case "$profile" in current) prefix="" ;; testing) prefix="testing-" ;; *) exit 1 ;; esac
 mkdir -p dist
@@ -16,6 +16,7 @@ cp --remove-destination "$kernel/bzImage" dist/unsigned/kernel.efi
 cp "$shim/share/efi/shimx64.efi" "$shim/share/efi/mmx64.efi" dist/unsigned/
 cp --remove-destination "$certs/modules.cer" "$certs/bundle.sha256" dist/unsigned/
 cp --remove-destination "$certs/approved-modules.json" dist/unsigned/
+cp flake.lock dist/unsigned/flake.lock
 # References des closures non signees pour diagnostic.
 nix path-info --recursive --json --json-format 1 "$kernel" "$certs" "$sdboot" "$shim" > dist/unsigned/nix-closure.json
 printf '%s\n' "$kernel" "$certs" "$sdboot" "$shim" > dist/unsigned/store-paths.txt
@@ -38,4 +39,4 @@ metadata = {
 }
 Path("dist/unsigned/release.json").write_text(json.dumps(metadata, indent=2) + "\n")
 PYMETA
-(cd dist/unsigned && sha256sum kernel.efi systemd-bootx64.efi shimx64.efi mmx64.efi modules.cer bundle.sha256 approved-modules.json release.json > SHA256SUMS)
+(cd dist/unsigned && sha256sum kernel.efi systemd-bootx64.efi shimx64.efi mmx64.efi modules.cer bundle.sha256 approved-modules.json release.json flake.lock > SHA256SUMS)

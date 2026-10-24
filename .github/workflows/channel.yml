@@ -11,7 +11,35 @@ env:
   GLF_CHANNEL: ${{ inputs.profile }}
   GLF_SHELL: ${{ inputs.profile == 'testing' && 'testing-ci' || 'ci' }}
 jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      needed: ${{ steps.release.outputs.needed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - name: Resoudre les channels une seule fois pour ce parcours
+        run: |
+          nix flake lock "path:$PWD" --refresh
+          python3 ci/channels.py --profile current
+          python3 ci/channels.py --profile testing
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resolved-lock-${{ inputs.profile }}
+          path: flake.lock
+          if-no-files-found: error
+          retention-days: 7
+      - name: Detecter une publication deja disponible
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/release-needed.sh
+
   validate:
+    needs: resolve
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -19,11 +47,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
-      - run: nix develop --no-update-lock-file .#"$GLF_SHELL" --command bash ci/check.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: resolved-lock-${{ inputs.profile }}
+          path: .
+      - run: nix develop --no-update-lock-file "path:$PWD#$GLF_SHELL" --command bash ci/check.sh
 
   build:
-    if: github.event_name != 'pull_request'
-    needs: validate
+    if: github.event_name != 'pull_request' && needs.resolve.outputs.needed == 'true'
+    needs: [resolve, validate]
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -31,6 +63,10 @@ jobs:
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - uses: actions/download-artifact@v4
+        with:
+          name: resolved-lock-${{ inputs.profile }}
+          path: .
       - run: bash ci/build.sh
       - name: Identifier la version GLF-OS
         id: version
@@ -57,6 +93,10 @@ jobs:
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - uses: actions/download-artifact@v4
+        with:
+          name: resolved-lock-${{ inputs.profile }}
+          path: .
       - name: Identifier la version GLF-OS
         id: version
         env:
@@ -67,7 +107,7 @@ jobs:
           name: unsigned-${{ inputs.profile }}-${{ steps.version.outputs.name }}-${{ github.sha }}
           path: dist/unsigned/
       - name: Preparer les outils sans secrets
-        run: nix print-dev-env --no-update-lock-file .#"$GLF_SHELL" > /tmp/glf-sign-tools.sh
+        run: nix print-dev-env --no-update-lock-file "path:$PWD#$GLF_SHELL" > /tmp/glf-sign-tools.sh
       - name: Signer les composants de cette revision
         env:
           GLF_SIGNING_KEY_PEM: ${{ secrets.GLF_SIGNING_KEY_PEM }}
@@ -77,7 +117,7 @@ jobs:
           source /tmp/glf-sign-tools.sh
           bash ci/sign.sh
       - name: Preparer la publication Nix
-        run: nix develop --no-update-lock-file .#"$GLF_SHELL" --command bash ci/package-release.sh
+        run: nix develop --no-update-lock-file "path:$PWD#$GLF_SHELL" --command bash ci/package-release.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: signed-${{ inputs.profile }}-${{ github.sha }}
@@ -87,6 +127,9 @@ jobs:
 
   publish:
     needs: sign
+    concurrency:
+      group: glf-secureboot-publication
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     permissions:
       contents: write

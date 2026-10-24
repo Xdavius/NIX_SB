@@ -10,3 +10,5 @@ gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$commit" \
   --draft --latest=false dist/release/glf-secureboot.tar.gz dist/release/release.json dist/release/build.json
 # Promouvoir la release seulement une fois tous les assets televerses.
 gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+# Nettoyer uniquement apres la publication complete de la nouvelle version.
+python3 "$(dirname "$0")/prune_releases.py" "$tag"

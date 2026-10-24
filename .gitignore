@@ -8,3 +8,6 @@
 *.priv
 
 __pycache__/
+
+# Resolution locale/CI des channels ; jamais versionnee.
+/flake.lock

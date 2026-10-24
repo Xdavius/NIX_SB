@@ -1,14 +1,14 @@
 # Signature centralisée des composants GLF
 
-Le workflow `.github/workflows/uki.yml` conserve son chemin historique, mais
-construit et publie désormais des composants **sans UKI**. Le workflow de demandes
+Le workflow `.github/workflows/secureboot-release.yml` surveille les channels GLF
+et construit et publie les composants Secure Boot **sans UKI**. Le workflow de demandes
 `sign-request.yml` et le client `glf-secureboot-sign` sont retirés.
 
 1. `validate` effectue les contrôles et tests locaux avec clé jetable.
 2. `build` construit noyau enrichi, certificats, systemd-boot et shim Rocky.
 3. `sign` vérifie les empreintes puis signe uniquement `kernel.efi` et
    `systemd-bootx64.efi` avec les secrets de `glf-signing-production`.
-4. `publish` publie l’archive et son descripteur Nix dans une release par commit,
+4. `publish` publie l’archive et son descripteur Nix dans une release identifiée par le commit et les révisions du channel,
    avec `contents: write`, mais sans accès à la clé privée.
 
 Shim Rocky et MokManager sont copiés sans modification. Le certificat public
