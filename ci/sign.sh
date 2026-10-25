@@ -28,7 +28,7 @@ for file in kernel.efi systemd-bootx64.efi refind_x64.efi; do
   sbverify --cert "$secret_dir/cert.pem" "dist/signed/$file"
 done
 # Signing may only change the signature fields, never the PE image content.
-PYTHONPATH=pkgs/boot-tools/src python3 - <<'PYVERIFY'
+PYTHONPATH="$(dirname -- "${BASH_SOURCE[0]}")/../pkgs/boot-tools/src" python3 - <<'PYVERIFY'
 from signing_protocol import pe_content
 for name in ("kernel.efi", "systemd-bootx64.efi", "refind_x64.efi"):
     if pe_content("dist/unsigned/" + name) != pe_content("dist/signed/" + name):
