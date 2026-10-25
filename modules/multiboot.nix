@@ -5,6 +5,7 @@ let
   installConfig = pkgs.writeText "glf-secureboot-install.json" (builtins.toJSON {
     esp = config.boot.loader.efi.efiSysMountPoint;
     certificate = "${sb.secureboot-certificate}/share/secureboot/GLF.pem";
+    certificateDer = "${sb.secureboot-certificate}/share/secureboot/GLF.cer";
     timeout = toString cfg.timeout;
     canTouchEfiVariables = config.boot.loader.efi.canTouchEfiVariables;
     installFallback = cfg.installFallback;

@@ -14,6 +14,7 @@ from boot_menu import menu_header
 REFIND = r'\EFI\refind\shimx64.efi'
 LEGACY_REFIND = r'\EFI\refind\refind_x64.efi'
 SYSTEMD = r'\EFI\GLF\shimx64.efi'
+DIRECT_SYSTEMD = r'\EFI\systemd\systemd-bootx64.efi'
 
 
 def settings(config):
@@ -50,8 +51,10 @@ def parse_firmware(text):
             continue
         label = re.split(r'\s+(?:HD|VenHw|BBS|PciRoot)\(', match[2], maxsplit=1)[0]
         path = re.search(r'File\(([^)]*)\)', line, re.I)
+        if path is None:
+            path = re.search(r'HD\([^)]*\)/(\\[^\s]+)', line, re.I)
         partition = re.search(r'HD\(\d+,(?:GPT|MBR),([^,]+),', line, re.I)
-        entries.append({'number': match[1].upper(), 'label': ' '.join(label.split()),
+        entries.append({'number': match[1].upper(), 'active': line[8:9] == '*', 'label': ' '.join(label.split()),
                         'path': path[1].replace('/', '\\').lower() if path else '',
                         'partition': partition[1].lower() if partition else ''})
     order = re.search(r'^BootOrder:\s*([0-9A-Fa-f,]+)', text, re.M)
@@ -68,8 +71,11 @@ def firmware_state(esp):
         ['lsblk', '--json', '--output', 'PKNAME,PARTN,PARTUUID', os.path.realpath(source)], text=True))['blockdevices'][0]
     if not all(block.get(k) for k in ('pkname', 'partn', 'partuuid')):
         raise ValueError('Impossible de determiner le disque/partition ESP')
-    entries, order = parse_firmware(subprocess.check_output(['efibootmgr', '--verbose'], text=True))
-    return {**block, 'entries': entries, 'order': order}
+    text = subprocess.check_output(['efibootmgr', '--verbose'], text=True)
+    entries, order = parse_firmware(text)
+    boot_next = re.search(r'^BootNext:\s*([0-9A-Fa-f]{4})\s*$', text, re.M)
+    return {**block, 'entries': entries, 'order': order,
+            'boot_next': boot_next[1].upper() if boot_next else None}
 
 
 def configure_firmware(state, enabled, make_default, remove_refind=False):
@@ -83,7 +89,13 @@ def configure_firmware(state, enabled, make_default, remove_refind=False):
         matches = [e for e in entries if own_entry(e, state['partuuid'], [path])]
     if not matches:
         raise ValueError('Nouvelle entree UEFI GLF introuvable')
-    number = matches[0]['number']
+    # Prefer the existing entry already selected in BootOrder, including
+    # inactive entries: activate it rather than creating a duplicate.
+    selected = next((entry for number in state['order'] for entry in matches
+                     if entry['number'] == number), matches[0])
+    number = selected['number']
+    if not selected['active']:
+        subprocess.run(['efibootmgr', '--bootnum', number, '--active'], check=True)
     obsolete_paths = [LEGACY_REFIND] if enabled else ([REFIND, LEGACY_REFIND] if remove_refind else [])
     obsolete = {e['number'] for e in state['entries'] if own_entry(e, state['partuuid'], obsolete_paths)}
     order = [n for n in state['order'] if n not in obsolete]
@@ -93,6 +105,13 @@ def configure_firmware(state, enabled, make_default, remove_refind=False):
         order.append(number)
     if order != state['order']:
         subprocess.run(['efibootmgr', '--bootorder', ','.join(order)], check=True)
+    # Redirect only a direct loader on this ESP, or an entry we are removing.
+    # A one-shot Windows/recovery/other-disk selection remains the user's choice.
+    pending = next((entry for entry in state['entries']
+                    if entry['number'] == state.get('boot_next')), None)
+    if pending and (own_entry(pending, state['partuuid'], [DIRECT_SYSTEMD])
+                    or pending['number'] in obsolete):
+        subprocess.run(['efibootmgr', '--bootnext', number], check=True)
     for old in sorted(obsolete):
         subprocess.run(['efibootmgr', '--delete-bootnum', '--bootnum', old], check=True)
 

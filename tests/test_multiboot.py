@@ -48,6 +48,75 @@ class MultibootTests(unittest.TestCase):
         self.assertIn('--create-only', run.call_args_list[0].args[0])
         self.assertEqual(run.call_args_list[1].args[0], ['efibootmgr', '--bootorder', '0002,0003,0001'])
 
+
+    def test_bare_paths_and_inactive_entry(self):
+        text = TEXT.replace('Boot0001*', 'Boot0001 ').replace(
+            r'File(\EFI\refind\shimx64.efi)', r'\EFI\refind\shimx64.efi')
+        entries, order = parse_firmware(text)
+        self.assertEqual(entries[0]['path'], r'\efi\refind\shimx64.efi')
+        self.assertFalse(entries[0]['active'])
+        state = {**self.state(), 'entries': entries, 'order': order}
+        with patch('multiboot.subprocess.run') as run:
+            configure_firmware(state, True, False)
+        run.assert_called_once_with(['efibootmgr', '--bootnum', '0001', '--active'], check=True)
+
+    def test_bootnext_redirected_only_for_direct_loader_on_same_esp(self):
+        for path, partition, redirect in [
+            (r'\efi\systemd\systemd-bootx64.efi', 'aaaa', True),
+            (r'\efi\systemd\systemd-bootx64.efi', 'bbbb', False),
+            (r'\efi\microsoft\boot\bootmgfw.efi', 'aaaa', False),
+        ]:
+            with self.subTest(path=path, partition=partition):
+                state = self.state()
+                state['entries'].append({'number': '0004', 'active': True,
+                                         'path': path, 'partition': partition})
+                state['boot_next'] = '0004'
+                with patch('multiboot.subprocess.run') as run:
+                    configure_firmware(state, True, False)
+                if redirect:
+                    run.assert_called_once_with(['efibootmgr', '--bootnext', '0001'], check=True)
+                else:
+                    run.assert_not_called()
+
+    def test_existing_candidate_in_bootorder_is_preferred(self):
+        state = self.state()
+        state['entries'].append({**state['entries'][0], 'number': '0004'})
+        state['order'] = ['0002', '0004', '0001', '0003']
+        with patch('multiboot.subprocess.run') as run:
+            configure_firmware(state, True, True)
+        run.assert_called_once_with(['efibootmgr', '--bootorder', '0004,0002,0001,0003'], check=True)
+
+    def test_bootnext_updated_before_removing_obsolete_entry(self):
+        state = self.state()
+        state['entries'].append({'number': '0004', 'active': True,
+                                 'path': r'\efi\refind\refind_x64.efi', 'partition': 'aaaa'})
+        state['boot_next'] = '0004'
+        with patch('multiboot.subprocess.run') as run:
+            configure_firmware(state, True, False)
+        self.assertEqual([call.args[0] for call in run.call_args_list], [
+            ['efibootmgr', '--bootnext', '0001'],
+            ['efibootmgr', '--delete-bootnum', '--bootnum', '0004']])
+
+    def test_firmware_state_reads_bootnext(self):
+        import json
+        from multiboot import firmware_state
+        with patch('multiboot.subprocess.check_output', side_effect=[
+            '/dev/sda1', json.dumps({'blockdevices': [
+                {'pkname': 'sda', 'partn': 1, 'partuuid': 'aaaa'}]}),
+            TEXT + 'BootNext: 0003\n',
+        ]):
+            self.assertEqual(firmware_state('/boot')['boot_next'], '0003')
+
+    def test_creation_failure_and_write_failure_propagate(self):
+        state = self.state()
+        state['entries'] = []
+        with patch('multiboot.subprocess.run'), patch('multiboot.subprocess.check_output', return_value=''):
+            with self.assertRaisesRegex(ValueError, 'introuvable'):
+                configure_firmware(state, True, False)
+        with patch('multiboot.subprocess.run', side_effect=RuntimeError('EFI write failed')):
+            with self.assertRaisesRegex(RuntimeError, 'EFI write failed'):
+                configure_firmware(self.state(), True, True)
+
     def test_quote_injection_and_control_characters(self):
         self.assertEqual(quoted('a"b'), '"a""b"')
         with self.assertRaises(ValueError):

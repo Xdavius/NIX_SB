@@ -1,7 +1,9 @@
 { lib, stdenvNoCC, makeWrapper, python3, sbsigntool, systemd, util-linux, efibootmgr, multibootAssets }:
 stdenvNoCC.mkDerivation {
   pname = "glf-secureboot";
-  version = "0.4.0";
+  version = "0.5.0";
+  # Consumers can drop their installer patches once this capability is present.
+  passthru.glfInstallerApi = 1;
   src = ./src;
   nativeBuildInputs = [ makeWrapper ];
   dontBuild = true;
