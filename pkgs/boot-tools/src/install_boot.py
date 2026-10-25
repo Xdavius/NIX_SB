@@ -154,7 +154,10 @@ def install(config, target, allow_unmounted=False):
                 multiboot.configure_firmware(state, cfg['enable'], cfg['makeDefault'] if cfg['enable'] else True,
                                             remove_refind=was_multiboot)
                 if not cfg['enable']:
-                    run('bootctl', '--esp-path=' + str(esp), 'set-default', entry)
+                    # The running session may have booted via rEFInd, which
+                    # does not expose LoaderInfo. EFI writes are authorized by
+                    # canTouchEfiVariables; target systemd-boot, not the old loader.
+                    run('bootctl', '--variables=yes', '--esp-path=' + str(esp), 'set-default', entry)
             else:
                 print("Variables EFI non modifiables : selectionner manuellement le shim GLF dans le firmware.")
             if not cfg['enable'] and was_multiboot:
