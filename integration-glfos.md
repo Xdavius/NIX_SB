@@ -279,7 +279,10 @@ in {
 
 La génération doit aussi contenir `init`. L’installateur ajoute lui-même
 `init=GENERATION/init`. Les paramètres doivent permettre de retrouver le système
-racine et contenir exactement `module.sig_enforce=1` et `lockdown=integrity`.
+racine. La configuration NixOS consommatrice choisit les paramètres de sécurité ;
+l’installateur ne force ni `module.sig_enforce` ni `lockdown`. Le module multiboot
+fourni conserve ces deux protections par défaut. L’initrd séparé et la ligne de
+commande ne sont pas authentifiés dans ce mode sans UKI.
 Ne pas fournir un second `init=`. Le bundle est référencé par la génération,
 ce qui conserve sa version lors d’un retour arrière.
 
@@ -301,6 +304,7 @@ environment.etc."secureboot/GLF.cer".source =
 environment.etc."secureboot/install.json".text = builtins.toJSON {
   esp = "/boot"; # point de montage FAT réel de l’ESP
   certificate = "${sb.secureboot-certificate}/share/secureboot/GLF.pem";
+  certificateDer = "${sb.secureboot-certificate}/share/secureboot/GLF.cer";
   timeout = "5";
   canTouchEfiVariables = false; # adapter à la politique d’installation
 };
@@ -399,3 +403,24 @@ Pour GLF-OS, le libelle est reconstruit avec `VERSION_CODENAME` du fichier
 Le nom de code NixOS (par exemple Zokor) n'est ainsi pas affiche ; le nom de
 version GLF (par exemple Rising) est conserve, y compris lors d'un rollback.
 Sans ces informations, le libelle du bootspec reste le secours.
+
+## Contrat de l’installateur 0.5.0
+
+`sb.boot-tools.glfInstallerApi = 1` annonce la prise en charge native de la
+migration EFI et de la politique noyau du consommateur. GLF-OS peut utiliser ce
+paquet directement, sans appliquer ses anciens patches. Ce marqueur doit être
+lu sur le paquet issu du commit de la release signée, pas sur la tête de Rising.
+
+L’installateur copie `certificateDer` dans `EFI/GLF/GLF.cer` pour l’enrôlement
+manuel MokManager. Pour les anciennes configurations JSON, le chemin par défaut
+est celui du certificat PEM avec l’extension `.cer`. Un certificat absent est
+refusé avant toute écriture sur l’ESP. Aucune clé privée n’est distribuée.
+
+La gestion firmware accepte les chemins `File(...)` et les chemins EFI nus.
+Elle réutilise l’entrée de la même ESP, l’active si nécessaire et conserve les
+entrées des autres systèmes. En multiboot, `makeDefault = false` préserve leur
+ordre. En mode systemd-boot seul, le shim GLF devient l’entrée par défaut.
+Un `BootNext` vers systemd-boot direct sur cette ESP, ou vers une entrée GLF
+obsolète supprimée par l’installateur, est redirigé vers le shim sélectionné.
+Les choix Windows, récupération et autres disques sont conservés. Toutes les
+écritures firmware restent conditionnées par `canTouchEfiVariables`.

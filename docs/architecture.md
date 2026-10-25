@@ -30,8 +30,12 @@ fournir les mêmes `kernelPackages` et `approvedModules` aux deux paquets.
 
 La chaîne de démarrage cible est UEFI → shim Rocky → systemd-boot signé → noyau
 signé avec initrd séparé. La confiance EFI et la confiance dans les modules sont distinctes.
-Les paramètres `module.sig_enforce=1` et `lockdown=integrity` doivent être
-présents dans l’entrée de démarrage locale, qui n’est pas signée. Le signataire doit contrôler les composants approuvés ;
+La politique noyau appartient à la configuration NixOS consommatrice. Le module
+multiboot fourni conserve `module.sig_enforce=1` et `lockdown=integrity` par défaut,
+mais l’installateur ne les impose pas : il conserve les paramètres de la génération.
+L’initrd séparé et la ligne de commande ne sont pas authentifiés par cette chaîne
+sans UKI ; les signatures EFI ne garantissent donc pas à elles seules une politique
+de verrouillage choisie par le consommateur. Le signataire doit contrôler les composants approuvés ;
 un catalogue local arbitraire ne constitue pas une autorisation de signature.
 
 Les certificats du noyau sont générés par les builds. La clé privée EFI reste

@@ -49,6 +49,7 @@ assert cfg.boot.uki.settings.UKI.Linux == "${sb.kernel}/bzImage";
 assert builtins.elem "module.sig_enforce=1" cfg.boot.kernelParams;
 assert builtins.elem "lockdown=integrity" cfg.boot.kernelParams;
 assert sb.boot-tools.pname == "glf-secureboot";
+assert sb.boot-tools.glfInstallerApi == 1;
 pkgs.runCommand "nix-sb-package-contract" {} ''
   echo "Catalogue valide, sources nixpkgs reutilisees et noyau coherent" > "$out"
 ''

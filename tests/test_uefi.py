@@ -40,6 +40,7 @@ with tempfile.TemporaryDirectory(prefix="glf-uefi-") as temp:
     run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
         "-subj", "/CN=GLF VM DISPOSABLE TEST/", "-keyout", key, "-out", cert,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    run("openssl", "x509", "-in", cert, "-outform", "DER", "-out", root / "cert.cer")
     initrd_root = root / "root"
     (initrd_root / "bin").mkdir(parents=True)
     shutil.copyfile(os.environ["GLF_VM_BUSYBOX"], initrd_root / "bin/busybox")

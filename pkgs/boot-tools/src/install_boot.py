@@ -68,10 +68,10 @@ def install(config, target, allow_unmounted=False):
         raise ValueError("Parametres noyau invalides")
     import shlex
     tokens = shlex.split(" ".join(params))
-    for key, expected in (("module.sig_enforce", "1"), ("lockdown", "integrity")):
-        matches = [p for p in tokens if p.split("=", 1)[0].replace("-", "_") == key.replace("-", "_")]
-        if matches != [f"{key}={expected}"] or "--" in tokens:
-            raise ValueError("Politique noyau invalide : " + key)
+    # The consumer's NixOS configuration owns kernel enforcement policy.
+    # Still reject parameters that could escape the kernel command line.
+    if "--" in tokens:
+        raise ValueError("Separateur de parametres init interdit")
     if any(p.split("=", 1)[0] == "init" for p in tokens):
         raise ValueError("init est fourni par l'installateur")
     timeout = str(config["timeout"])
@@ -89,6 +89,9 @@ def install(config, target, allow_unmounted=False):
     for name in ("shimx64.efi", "mmx64.efi"):
         if not (bundle / name).is_file():
             raise ValueError("Publication incomplete : " + name)
+    certificate_der = Path(config.get("certificateDer", str(Path(config["certificate"]).with_suffix(".cer"))))
+    if not certificate_der.is_file():
+        raise ValueError("Certificat DER absent pour MokManager")
     esp = validate_esp(config, allow_unmounted)
     refind_dir = esp / 'EFI/refind'
     was_multiboot = (refind_dir / '.glf-managed').is_file()
@@ -129,6 +132,7 @@ def install(config, target, allow_unmounted=False):
                 atomic_copy(marker, esp / bootdir / '.glf-managed')
             atomic_copy(bundle / "systemd-bootx64.efi", esp / "EFI/systemd/systemd-bootx64.efi")
             atomic_copy(config["certificate"], esp / "EFI/GLF/GLF.pem")
+            atomic_copy(certificate_der, esp / "EFI/GLF/GLF.cer")
             cmdline = " ".join([f"init={target}/init", *params])
             boot_entry = work / "entry.conf"
             boot_entry.write_text(menu_header(target) + f"linux /{directory}/kernel.efi\n"
@@ -147,15 +151,18 @@ def install(config, target, allow_unmounted=False):
                 if config.get('installFallback', True) and cfg['makeDefault']:
                     atomic_copy(esp / 'EFI/refind/refind.conf', esp / 'EFI/BOOT/refind.conf')
             if config['canTouchEfiVariables']:
-                multiboot.configure_firmware(state, cfg['enable'], cfg['makeDefault'] if cfg['enable'] else was_multiboot,
+                multiboot.configure_firmware(state, cfg['enable'], cfg['makeDefault'] if cfg['enable'] else True,
                                             remove_refind=was_multiboot)
                 if not cfg['enable']:
                     run('bootctl', '--esp-path=' + str(esp), 'set-default', entry)
+            else:
+                print("Variables EFI non modifiables : selectionner manuellement le shim GLF dans le firmware.")
             if not cfg['enable'] and was_multiboot:
                 multiboot.remove_menu(esp)
                 if config.get('installFallback', True):
                     (esp / 'EFI/BOOT/refind.conf').unlink(missing_ok=True)
             multiboot.cleanup(esp)
+            print("Si MokManager demande une cle : Enroll key from disk -> EFI/GLF/GLF.cer.")
             print(f"Generation installee : {entry}. Noyau signe et initrd local separe.")
 
 

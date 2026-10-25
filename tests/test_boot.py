@@ -23,6 +23,9 @@ class BootTests(unittest.TestCase):
         subprocess.run(['openssl', 'req', '-newkey', 'rsa:2048', '-nodes', '-x509', '-days', '1',
                         '-subj', '/CN=GLF DISPOSABLE TEST/', '-keyout', str(self.key), '-out', str(self.cert)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cert_der = self.root / 'cert.cer'
+        subprocess.run(['openssl', 'x509', '-in', str(self.cert), '-outform', 'DER',
+                        '-out', str(self.cert_der)], check=True)
         self.bundle = self.root / 'bundle'
         self.bundle.mkdir()
         for name, source in [('kernel.efi', 'GLF_TEST_STUB'), ('systemd-bootx64.efi', 'GLF_TEST_BOOT')]:
@@ -52,6 +55,7 @@ class BootTests(unittest.TestCase):
             install(self.config, target, allow_unmounted=True)
         identifier = hashlib.sha256(str(first).encode()).hexdigest()[:32]
         entry = f'glf-{identifier}.conf'
+        self.assertEqual((self.esp / 'EFI/GLF/GLF.cer').read_bytes(), self.cert_der.read_bytes())
         self.assertEqual(len(list((self.esp / 'loader/entries').glob('*.conf'))), 2)
         self.assertIn(entry, (self.esp / 'loader/loader.conf').read_text())
         contents = (self.esp / 'loader/entries' / entry).read_text()
@@ -84,12 +88,48 @@ class BootTests(unittest.TestCase):
     def test_parameter_injection_rejected(self):
         target = self.target('bad-params')
         meta = json.loads((target / 'glf-secureboot.json').read_text())
-        for param in ('root=x\nlinux /other.efi', 'module.sig_enforce=0', 'init=/other/init'):
+        for param in ('root=x\nlinux /other.efi', '--', 'init=/other/init'):
             altered = {**meta, 'kernelParams': meta['kernelParams'] + [param]}
             (target / 'glf-secureboot.json').write_text(json.dumps(altered))
             with self.assertRaises(ValueError):
                 install(self.config, target, allow_unmounted=True)
             self.assertFalse(self.esp.exists())
+
+    def test_consumer_kernel_policy_is_preserved(self):
+        target = self.target('native-policy')
+        meta = json.loads((target / 'glf-secureboot.json').read_text())
+        for params in (['root=LABEL=machine-specific'],
+                       ['lockdown=integrity'], ['module.sig_enforce=0', 'lockdown=none']):
+            meta['kernelParams'] = params
+            (target / 'glf-secureboot.json').write_text(json.dumps(meta))
+            install(self.config, target, allow_unmounted=True)
+            entry = next((self.esp / 'loader/entries').glob('*.conf')).read_text()
+            self.assertIn('options ' + ' '.join([f'init={target}/init', *params]) + '\n', entry)
+
+    def test_single_firmware_configuration_pass(self):
+        config = {**self.config, 'canTouchEfiVariables': True}
+        state = {'entries': [], 'order': [], 'partuuid': 'test-esp'}
+        with patch('install_boot.validate_esp', return_value=self.esp), \
+             patch('multiboot.firmware_state', return_value=state) as discover, \
+             patch('multiboot.configure_firmware') as configure, \
+             patch('install_boot.run'):
+            install(config, self.target('firmware-pass'))
+        discover.assert_called_once_with(self.esp)
+        enabled = config.get('multiboot', {}).get('enable', False)
+        configure.assert_called_once_with(state, enabled, True, remove_refind=False)
+
+    def test_missing_der_preserves_esp(self):
+        self.config['certificateDer'] = str(self.root / 'missing.cer')
+        with self.assertRaisesRegex(ValueError, 'Certificat DER absent'):
+            install(self.config, self.target('missing-der'), allow_unmounted=True)
+        self.assertFalse(self.esp.exists())
+
+    def test_explicit_der_path(self):
+        custom = self.root / 'custom.der'
+        self.cert_der.rename(custom)
+        self.config['certificateDer'] = str(custom)
+        install(self.config, self.target('explicit-der'), allow_unmounted=True)
+        self.assertEqual((self.esp / 'EFI/GLF/GLF.cer').read_bytes(), custom.read_bytes())
 
 
 class MultibootTests(BootTests):
