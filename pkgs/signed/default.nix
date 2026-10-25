@@ -11,6 +11,9 @@ let
     inherit (release) url;
     hash = release.archiveHash;
   };
+  # Identity only: do not realise the full module catalogue on consumers.
+  # The pinned archive contains both this provenance and the signed image.
+  expectedKernel = builtins.unsafeDiscardStringContext (toString kernel);
   bundle = runCommand "glf-secureboot-signed-${release.commit}" {
     nativeBuildInputs = [ python3 openssl sbsigntool jq ];
   } ''
@@ -40,12 +43,24 @@ from signing_protocol import pe_content
 from pathlib import Path
 if Path('refind_x64.efi').exists():
     assert pe_content('refind_x64.efi') == pe_content('${refind}/share/efi/refind_x64.efi'), 'rEFInd incompatible'
-assert pe_content('kernel.efi') == pe_content('${kernel}/bzImage'), 'Noyau incompatible avec cette revision'
+assert Path('store-paths.txt').read_text().splitlines()[0] == ${builtins.toJSON expectedKernel}, 'Noyau incompatible avec cette revision'
 assert pe_content('systemd-bootx64.efi') == pe_content('${systemd}/lib/systemd/boot/efi/systemd-bootx64.efi'), 'Chargeur incompatible'
 PY
   '';
 in {
   inherit bundle;
+  consumerApi = 1;
+  # Explicit reproducibility audit; consumers do not depend on this output.
+  verifiedBuild = runCommand "glf-secureboot-rebuilt-${release.commit}" {
+    nativeBuildInputs = [ python3 ];
+  } ''
+    export PYTHONPATH=${../boot-tools/src}
+    python3 - <<'PYVERIFY'
+from signing_protocol import pe_content
+assert pe_content('${bundle}/kernel.efi') == pe_content('${kernel}/bzImage'), 'Noyau incompatible avec cette revision'
+PYVERIFY
+    touch "$out"
+  '';
   kernel = runCommand "glf-kernel-signed-${kernel.version}" {} ''
     mkdir -p "$out"
     ln -s ${bundle}/kernel.efi "$out/bzImage"

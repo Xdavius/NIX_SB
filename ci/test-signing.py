@@ -33,10 +33,13 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     (unsigned / "nix-closure.json").write_text("{}")
     (unsigned / "flake.lock").write_text('{"fixture": true}\n')
     # Include real store references: an unpacked fixed-output fetch must fail.
-    (unsigned / "store-paths.txt").write_text(str(stub) + "\n")
+    Path("published-kernel").mkdir()
+    shutil.copyfile(stub, "published-kernel/bzImage")
+    kernel_path = run(['nix', 'store', 'add-path', str(Path('published-kernel').resolve())]).strip()
+    (unsigned / "store-paths.txt").write_text(kernel_path + "\n" + str(stub) + "\n")
     hashes = "".join(
         f"{hashlib.sha256((unsigned / name).read_bytes()).hexdigest()}  {name}\n"
-        for name in ("kernel.efi", "refind_x64.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi", "modules.cer", "bundle.sha256")
+        for name in ("kernel.efi", "refind_x64.efi", "systemd-bootx64.efi", "shimx64.efi", "mmx64.efi", "modules.cer", "bundle.sha256", "store-paths.txt")
     )
     (unsigned / "SHA256SUMS").write_text(hashes)
     run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
@@ -94,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
   signed = pkgs.callPackage ./pkgs/signed {{
     releaseFile = ./release.json;
     fetchurl = args: pkgs.fetchurl (args // {{ url = "file://${{./archive.tar.gz}}"; }});
-    kernel = {{ outPath = builtins.path {{ path = ./kernel; }}; version = "fixture"; }};
+    kernel = {{ outPath = "{kernel_path}"; version = "fixture"; }};
     systemd = ./systemd;
     refind = ./refind;
     rockyShim = ./shim;

@@ -5,7 +5,7 @@ let
     inherit pkgs;
     modules = [ ../modules/multiboot.nix {
       system.stateVersion = "26.05";
-      glf.secureboot.packageSet = sb // { signed.bundle = pkgs.emptyDirectory; };
+      glf.secureboot.packageSet = sb // { signed = { bundle = pkgs.emptyDirectory; kernel = pkgs.emptyDirectory; }; };
       boot.loader.efi.canTouchEfiVariables = false;
       fileSystems."/" = { device = "none"; fsType = "tmpfs"; };
     } options ];

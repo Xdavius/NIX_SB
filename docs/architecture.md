@@ -42,3 +42,23 @@ Les certificats du noyau sont générés par les builds. La clé privée EFI res
 extérieure aux paquets et au store Nix. Le provisionnement et la publication des
 composants signés sont fournis par les workflows de ce dépôt. Aucun client de
 signature n’est distribué aux postes. Voir integration-glfos.md à la racine.
+
+## Consommation sans reconstruction du catalogue
+
+La CI continue de construire le noyau avec **tous les certificats du catalogue**,
+NVIDIA compris, puis de signer cette image. Aucune sélection par matériel ne
+modifie le noyau publié ou son arbre de certificats.
+
+`signed.consumerApi = 1` expose une consommation sans dépendance de build au
+noyau reconstruit : `signed.bundle` vérifie le hash de l'archive, ses manifestes,
+le certificat de production et les signatures, puis compare la première ligne
+de `store-paths.txt` à l'identité Nix attendue du noyau. Cette identité est
+évaluée sans réaliser la dérivation. Le consommateur fait confiance à la
+publication épinglée pour l'association entre cette identité et l'image signée.
+La signature seule n'atteste pas cette association.
+
+Les métadonnées de démarrage référencent `signed.kernel`. Le contrôle explicite
+`signed.verifiedBuild` reconstruit le catalogue complet et compare le contenu PE
+à celui de la publication ; il ne fait pas partie du build des postes. La CI
+vérifie également que signer les images ne modifie pas leur contenu PE.
+Les pilotes activés sur le poste restent construits/installés normalement.
