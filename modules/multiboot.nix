@@ -14,7 +14,7 @@ let
   metadata = pkgs.writeText "glf-secureboot.json" (builtins.toJSON {
     version = 2;
     signedBundle = "${sb.signed.bundle}";
-    kernel = "${sb.kernel}/bzImage";
+    kernel = "${sb.signed.kernel}/bzImage";
     initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
     kernelParams = config.boot.kernelParams;
   });

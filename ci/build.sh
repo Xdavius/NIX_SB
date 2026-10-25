@@ -41,4 +41,4 @@ metadata = {
 }
 Path("dist/unsigned/release.json").write_text(json.dumps(metadata, indent=2) + "\n")
 PYMETA
-(cd dist/unsigned && sha256sum kernel.efi refind_x64.efi systemd-bootx64.efi shimx64.efi mmx64.efi modules.cer bundle.sha256 approved-modules.json release.json flake.lock > SHA256SUMS)
+(cd dist/unsigned && sha256sum kernel.efi refind_x64.efi systemd-bootx64.efi shimx64.efi mmx64.efi modules.cer bundle.sha256 approved-modules.json release.json flake.lock store-paths.txt > SHA256SUMS)
