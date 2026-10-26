@@ -10,7 +10,7 @@ le catalogue de confiance et les outils de signature Secure Boot.
 
 - `kernel.json` : famille du noyau choisie dans nixpkgs (`linuxPackages_6_18`).
 - `flake.lock` : fichier local/CI temporaire, ignore par Git ; les versions viennent des channels GLF-OS.
-- `pkgs/drivers/catalogue.json` : les sept drivers externes GLF-OS et xonedo.
+- `pkgs/drivers/catalogue.json` : dix drivers approuvés, dont xonedo, xpad-noone et openrazer.
 - `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes, gérés ici.
 - `pkgs/drivers/hid-fanatecff` et `new-lg4ff` : vos définitions désormais maintenues ici.
 - `pkgs/kernel` : sélection du noyau et production de son image enrichie des certificats.

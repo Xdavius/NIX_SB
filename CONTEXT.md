@@ -352,3 +352,16 @@ Le PNG original reste une référence et l’icône du menu est inchangée.
 Validation VMware encore nécessaire ; la compression ne réduit pas le tampon
 image décodé. Secure Boot est maintenant activé par défaut dans le module,
 multiboot reste false ; évaluation Nix des défauts et opt-out réussie.
+
+## 2026-10-26 — ajout xpad-noone et openrazer au catalogue
+
+À la demande de l’utilisateur, le catalogue passe à dix entrées : xpad-noone
+et openrazer réutilisent les paquets du même kernelPackages que les autres
+drivers. L’ancienne exclusion de xpad-noone du catalogue est levée ; aucune
+activation ni modification GLF-OS. Documentation et contrat Nix mis à jour.
+
+Validation : test Python du catalogue et git diff --check réussis ; évaluation
+de checks.x86_64-linux.testing-packages.drvPath réussie sans build après
+résolution des channels dans le lock temporaire ignoré. Le pin nixpkgs testing
+résolu est 3ec636362e1816bc2f0888fa0fa2c69f1bc9e504 (noyau 6.18.58).
+Aucune compilation, validation matérielle, signature ou publication effectuée.
