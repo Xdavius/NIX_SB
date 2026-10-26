@@ -29,7 +29,7 @@ assert sb.drivers.new-lg4ff.outPath == (kernelPackages.callPackage
 assert cfg.boot.kernelPackages.kernel.outPath == sb.kernelPackages.kernel.outPath;
 assert sb.kernelPackages.kernel.version == sb.kernel.version;
 assert builtins.attrNames sb.drivers == [
-  "hid-fanatecff" "hid-tmff2" "new-lg4ff" "nvidia-open" "v4l2loopback" "xone" "xonedo" "xpadneo"
+  "hid-fanatecff" "hid-tmff2" "new-lg4ff" "nvidia-open" "openrazer" "v4l2loopback" "xone" "xonedo" "xpad-noone" "xpadneo"
 ];
 assert sb.drivers.nvidia-open.outPath == sb.nvidia.open.outPath;
 assert sb.drivers.nvidia-open.version == "${sb.nvidia.version}-${kernelPackages.kernel.version}";
@@ -38,6 +38,8 @@ assert builtins.elem "INSTALL_MOD_DIR=extra/xonedo" sb.drivers.xonedo.installFla
 assert sb.drivers.xonedo.installTargets == [ "modules_install" ];
 assert sb.drivers.xone.outPath == kernelPackages.xone.outPath;
 assert sb.drivers.xpadneo.outPath == kernelPackages.xpadneo.outPath;
+assert sb.drivers.xpad-noone.outPath == kernelPackages.xpad-noone.outPath;
+assert sb.drivers.openrazer.outPath == kernelPackages.openrazer.outPath;
 assert sb.drivers.hid-tmff2.outPath == kernelPackages.hid-tmff2.outPath;
 assert builtins.elem "DEPMOD=true" sb.drivers.v4l2loopback.makeFlags;
 assert sb.kernel.moduleCertificates == "${sb.modulesTree}/lib/modules/${kernelPackages.kernel.modDirVersion}/modules.cer";

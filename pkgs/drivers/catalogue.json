@@ -11,6 +11,12 @@
   "xpadneo": {
     "package": "xpadneo"
   },
+  "xpad-noone": {
+    "package": "xpad-noone"
+  },
+  "openrazer": {
+    "package": "openrazer"
+  },
   "hid-tmff2": {
     "package": "hid-tmff2"
   },

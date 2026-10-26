@@ -234,6 +234,8 @@ Cet exemple sélectionne seulement Fanatec et xonedo. Adapter les choix de
 | Logitech force feedback | `sb.drivers.new-lg4ff` |
 | Xbox xone ou xonedo | `sb.drivers.xone` **ou** `sb.drivers.xonedo` |
 | Xbox Bluetooth | `sb.drivers.xpadneo` |
+| xpad sans Xbox One | `sb.drivers.xpad-noone` |
+| Périphériques Razer | `sb.drivers.openrazer` |
 | Thrustmaster | `sb.drivers.hid-tmff2` |
 | Caméra virtuelle | `sb.drivers.v4l2loopback` |
 
