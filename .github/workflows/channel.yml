@@ -87,7 +87,7 @@ jobs:
   sign:
     needs: build
     if: >-
-      github.event_name != 'pull_request' && github.ref == 'refs/heads/Rising' &&
+      github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
       github.ref_protected &&
       vars.GLF_SIGNING_ENABLED == 'true'
     environment: glf-signing-production
@@ -132,7 +132,7 @@ jobs:
 
   publish:
     needs: sign
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/Rising'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     concurrency:
       group: glf-secureboot-publication
       cancel-in-progress: false

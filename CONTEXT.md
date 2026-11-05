@@ -396,3 +396,15 @@ Il définit les deux variantes : default = linuxPackages_6_18, latest = linuxPac
 select.nix et les métadonnées de ci/build.sh lisent cette même configuration ;
 aucun nom de famille noyau n’est codé en dur dans ces consommateurs.
 Les références antérieures au fichier racine dans cet historique sont obsolètes.
+
+
+## 2026-11-05 — branche par défaut main
+
+À la demande de l’utilisateur, Rising est renommée main et main devient la
+branche par défaut GitHub. L’ancienne main est conservée sous
+main-archive-2026-11-05. La protection validate obligatoire, enforce_admins
+et le refus des force-push sont conservés. Les restrictions de branche des
+environnements glf-signing-production et glf-key-bootstrap ciblent main.
+Les conditions de signature/publication et la documentation suivent main ;
+Rising reste le nom de la version GLF-OS. Les références historiques à la
+branche Rising sont donc obsolètes. Aucun secret ni workflow de signature déclenché.

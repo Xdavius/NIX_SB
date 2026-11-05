@@ -1,6 +1,6 @@
 # NIX_SB — noyau et drivers GLF
 
-Une branche correspond à une version GLF-OS : **Rising** pour la version actuelle.
+La branche par défaut **main** porte la version GLF-OS actuelle, **Rising**.
 Deux profils sont définis : current (glf-os-channels) et testing (testing-channels).
 Temporairement, seul testing est construit et publié ; current est explicitement
 indisponible et non bloquant pour la fusion. Les contrôles testing restent obligatoires.

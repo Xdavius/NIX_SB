@@ -1,6 +1,6 @@
 # CI par branche et par canal GLF-OS
 
-Chaque branche de version (Rising actuellement) est traitée avec deux profils :
+Chaque branche de version (main pour Rising actuellement) est traitée avec deux profils :
 
 | Profil | Dépôt channels | Sorties internes NIX_SB |
 | --- | --- | --- |
