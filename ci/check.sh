@@ -6,10 +6,13 @@ shellcheck ci/*.sh
 actionlint
 profile=${GLF_CHANNEL:-current}
 case "$profile" in current) prefix="" ;; testing) prefix="testing-" ;; *) exit 1 ;; esac
+variant=${GLF_KERNEL_VARIANT:-default}
+case "$variant" in default) ;; latest) prefix="${prefix}latest-" ;; *) exit 1 ;; esac
 python3 ci/channels.py --profile "$profile"
 flake_ref=${GLF_FLAKE_REF:-path:$PWD}
 nix eval "$flake_ref#checks.x86_64-linux.${prefix}packages.drvPath" --no-update-lock-file
 nix eval "$flake_ref#checks.x86_64-linux.${prefix}multiboot-module.drvPath" --no-update-lock-file
+python3 -m unittest discover -s tests -p 'test_kernel_variant.py'
 python3 -m unittest discover -s tests -p 'test_catalogue.py'
 python3 -m unittest discover -s tests -p 'test_signed_consumer.py'
 python3 -m unittest discover -s tests -p 'test_release_tag.py'

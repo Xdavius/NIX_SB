@@ -13,7 +13,7 @@ démarrage ne sont pas authentifiés dans ce mode.
 | Élément | Responsable |
 | --- | --- |
 | Révisions nixpkgs et nixpkgs-unstable par version | `channels-glfos` |
-| Famille noyau et définitions de pilotes | NIX_SB : `kernel.json`, `pkgs/drivers/` |
+| Famille noyau et définitions de pilotes | NIX_SB : `pkgs/kernel/kernel.json`, `pkgs/drivers/` |
 | Catalogue, définitions de pilotes, version NVIDIA | NIX_SB : `pkgs/drivers/` |
 | Confiance des modules intégrée au noyau | NIX_SB : `sb.kernel` |
 | Shim et MokManager avec leurs signatures originales | `sb.rocky-shim` |
@@ -426,3 +426,40 @@ Un `BootNext` vers systemd-boot direct sur cette ESP, ou vers une entrée GLF
 obsolète supprimée par l’installateur, est redirigé vers le shim sélectionné.
 Les choix Windows, récupération et autres disques sont conservés. Toutes les
 écritures firmware restent conditionnées par `canTouchEfiVariables`.
+
+
+## Choix entre le noyau par défaut et latest
+
+NIX_SB publie deux variantes indépendantes sur testing. `default` conserve
+la famille de `pkgs/kernel/kernel.json` (`linuxPackages_6_18`) ; `latest` utilise
+`linuxPackages_latest` fourni par le même nixpkgs GLF. Latest n'est pas un
+channel supplémentaire : sa version dépend du pin nixpkgs résolu. Les deux
+variantes peuvent donc temporairement désigner la même version.
+
+Le futur sélecteur GLF-OS doit fournir le choix au packageSet entier :
+
+```nix
+sb = pkgs.callPackage sourceNixSb {
+  kernelVariant = "latest"; # ou "default", valeur par défaut
+  signedReleaseFile = ./secureboot-release-latest.json;
+};
+```
+
+Le descripteur doit provenir de la release de la variante choisie, avec le
+même profil et les mêmes pins channels. Les nouvelles releases indiquent
+`kernelVariant` dans leur descripteur et leur manifeste ; le consommateur
+refuse une variante incompatible. Les anciens descripteurs sans ce champ
+restent associés à `default`.
+
+Utiliser `sb.kernelPackages` pour le noyau de base et tous les drivers,
+et `sb.signed.kernel` pour l'image signée. Ne pas mélanger les drivers de
+l'autre variante. Le module multiboot reçoit ce même packageSet ; `glf-update`
+reste responsable de l'installation de la génération construite.
+Aucun sélecteur GLF-OS n'est ajouté par ce dépôt.
+
+Sorties internes : `testing-kernel` et `testing-latest-kernel`, avec leurs
+certificats, drivers et contrôles respectifs. Pour les scripts CI, utiliser
+`GLF_CHANNEL=testing GLF_KERNEL_VARIANT=latest`. Les deux variantes sont
+obligatoires dans la CI ; current reste explicitement indisponible.
+Les releases latest portent le préfixe `secureboot-testing-latest-` ;
+la rétention existante de sept releases au total couvre les deux variantes.

@@ -1,6 +1,6 @@
 # Migration vers le centre noyau/drivers
 
-NIX_SB centralise désormais la famille noyau dans kernel.json, la version exacte
+NIX_SB centralise désormais la famille noyau dans pkgs/kernel/kernel.json, la version exacte
 via le lock nixpkgs, les définitions de drivers GLF et le service de signature.
 Aucune modification GLF-OS ni suppression des anciens dépôts n’est effectuée.
 

@@ -1,7 +1,7 @@
-{ pkgs, catalogueFile ? ./pkgs/drivers/catalogue.json, signedReleaseFile ? null }:
+{ pkgs, catalogueFile ? ./pkgs/drivers/catalogue.json, signedReleaseFile ? null, kernelVariant ? "default" }:
 let
   inherit (pkgs) callPackage;
-  kernelPackages = import ./pkgs/kernel/select.nix { inherit pkgs; };
+  kernelPackages = import ./pkgs/kernel/select.nix { inherit pkgs kernelVariant; };
   drivers = builtins.removeAttrs (callPackage ./pkgs/drivers {
     inherit kernelPackages catalogueFile;
   }) [ "override" "overrideDerivation" ];
@@ -21,7 +21,7 @@ in rec {
   nixosModule = ./modules/multiboot.nix;
   secureboot-certificate = callPackage ./pkgs/secureboot-certificate {};
   signed = if signedReleaseFile == null then null else callPackage ./pkgs/signed {
-    inherit kernel refind;
+    inherit kernel refind kernelVariant;
     rockyShim = rocky-shim;
     releaseFile = signedReleaseFile;
   };

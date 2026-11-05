@@ -30,8 +30,6 @@ class ReleaseNeededTests(unittest.TestCase):
                 'pkgs': {'locked': {'rev': 'b' * 40, 'narHash': 'fixture'}},
             }}
             (work / 'flake.lock').write_text(json.dumps(lock))
-            tag = release_tag({'profile': 'testing', 'branch': 'Rising', 'commit': 'c' * 40,
-                               'channels': channel_info(lock, 'testing')})
             mock = work / 'gh'
             mock.write_text('#!/bin/sh\ncat releases.json\nexit "${MOCK_EXIT:-0}"\n')
             mock.chmod(0o755)
@@ -39,17 +37,27 @@ class ReleaseNeededTests(unittest.TestCase):
             env = {**os.environ, 'PATH': str(work) + ':' + os.environ['PATH'],
                    'GITHUB_REPOSITORY': 'fixture/repo', 'GITHUB_REF_NAME': 'Rising',
                    'GITHUB_SHA': 'c' * 40, 'GLF_CHANNEL': 'testing', 'GITHUB_OUTPUT': str(output)}
-            cases = [([], 'true'), ([{'tag_name': tag, 'draft': False}], 'false'),
-                     ([{'tag_name': tag, 'draft': True}], 'true'),
-                     ([{'tag_name': tag + '-old', 'draft': False}], 'true')]
-            for releases, needed in cases:
-                with self.subTest(releases=releases):
-                    output.write_text('')
-                    (work / 'releases.json').write_text(json.dumps([releases]))
-                    result = subprocess.run(['bash', str(ROOT / 'ci/release-needed.sh')],
-                                            cwd=work, env=env, capture_output=True, text=True)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertEqual(output.read_text(), f'needed={needed}\n')
+            for variant in ('default', 'latest'):
+                env['GLF_KERNEL_VARIANT'] = variant
+                tag = release_tag({'profile': 'testing', 'branch': 'Rising',
+                                   'commit': 'c' * 40, 'kernelVariant': variant,
+                                   'channels': channel_info(lock, 'testing')})
+                other_tag = release_tag({'profile': 'testing', 'branch': 'Rising',
+                                         'commit': 'c' * 40,
+                                         'kernelVariant': 'latest' if variant == 'default' else 'default',
+                                         'channels': channel_info(lock, 'testing')})
+                cases = [([], 'true'), ([{'tag_name': tag, 'draft': False}], 'false'),
+                         ([{'tag_name': tag, 'draft': True}], 'true'),
+                         ([{'tag_name': tag + '-old', 'draft': False}], 'true'),
+                         ([{'tag_name': other_tag, 'draft': False}], 'true')]
+                for releases, needed in cases:
+                    with self.subTest(variant=variant, releases=releases):
+                        output.write_text('')
+                        (work / 'releases.json').write_text(json.dumps([releases]))
+                        result = subprocess.run(['bash', str(ROOT / 'ci/release-needed.sh')],
+                                                cwd=work, env=env, capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(output.read_text(), f'needed={needed}\n')
             output.write_text('')
             result = subprocess.run(['bash', str(ROOT / 'ci/release-needed.sh')],
                                     cwd=work, env={**env, 'MOCK_EXIT': '1'}, capture_output=True)

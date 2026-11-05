@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 
 
-TAG = re.compile(r'secureboot-(?:current|testing)-[a-f0-9]{12}-[a-f0-9]{40}(?:-[a-f0-9]{64})?')
+TAG = re.compile(r'secureboot-(?:current|testing)(?:-latest)?-[a-f0-9]{12}-[a-f0-9]{40}(?:-[a-f0-9]{64})?')
 
 
 def obsolete_releases(releases, published_tag):

@@ -46,8 +46,19 @@ class SignedConsumer(unittest.TestCase):
           bundleDrv = signed.bundle.drvPath;
           script = signed.bundle.script;
         }'''.replace('MODULE', str(ROOT / 'pkgs/signed/default.nix')).replace('RELEASE', str(release))
+        cls.expression = expr
         cls.result = json.loads(subprocess.check_output(
             ['nix-instantiate', '--eval', '--strict', '--json', '--expr', expr], text=True))
+
+    def test_other_kernel_variant_rejected(self):
+        expression = self.expression.replace(
+            'inherit runCommand kernel;',
+            'inherit runCommand kernel; kernelVariant = "latest";')
+        result = subprocess.run(
+            ['nix-instantiate', '--eval', '--strict', '--json', '--expr', expression],
+            capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('assertion', result.stderr)
 
     def test_consumer_does_not_require_catalogue_build(self):
         r = self.result

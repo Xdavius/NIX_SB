@@ -8,7 +8,9 @@ indisponible et non bloquant pour la fusion. Les contrôles testing restent obli
 Ce dépôt centralise le choix du noyau nixpkgs, les définitions des drivers GLF,
 le catalogue de confiance et les outils de signature Secure Boot.
 
-- `kernel.json` : famille du noyau choisie dans nixpkgs (`linuxPackages_6_18`).
+- Deux variantes testing sont construites et publiées : `default` (famille de
+  `pkgs/kernel/kernel.json`) et `latest` (`linuxPackages_latest` du même channel).
+- `pkgs/kernel/kernel.json` : familles nixpkgs des variantes `default` et `latest`.
 - `flake.lock` : fichier local/CI temporaire, ignore par Git ; les versions viennent des channels GLF-OS.
 - `pkgs/drivers/catalogue.json` : dix drivers approuvés, dont xonedo, xpad-noone et openrazer.
 - `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes, gérés ici.

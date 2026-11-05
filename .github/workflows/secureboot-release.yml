@@ -21,12 +21,17 @@ jobs:
           echo "### Current : indisponible" >> "$GITHUB_STEP_SUMMARY"
           echo "Exception temporaire autorisee : seule la reussite de testing conditionne la fusion. Aucun artefact current n'est publie." >> "$GITHUB_STEP_SUMMARY"
   testing:
+    strategy:
+      fail-fast: false
+      matrix:
+        kernel-variant: [default, latest]
     # Le workflow appele restreint ce droit au seul job de publication.
     permissions:
       contents: write
     uses: ./.github/workflows/channel.yml
     with:
       profile: testing
+      kernel-variant: ${{ matrix.kernel-variant }}
     secrets: inherit
   validate:
     if: always()
