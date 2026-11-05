@@ -1,6 +1,6 @@
 # Architecture
 
-NIX_SB contient des paquets, sans dépendance vers le code GLF-OS. Le choix de `kernelPackages` est centralisé dans `kernel.json`, avec une
+NIX_SB contient des paquets, sans dépendance vers le code GLF-OS. Le choix de `kernelPackages` est centralisé dans `pkgs/kernel/kernel.json`, avec une
 révision nixpkgs choisie par les channels GLF-OS. La CI doit reprendre cet ensemble.
 GLF-OS référence les sources dans glf-apps (flake = false) et appelle les paquets
 via callPackage ; la flake interne NIX_SB n’est pas son interface.

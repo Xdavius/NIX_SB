@@ -365,3 +365,34 @@ de checks.x86_64-linux.testing-packages.drvPath réussie sans build après
 résolution des channels dans le lock temporaire ignoré. Le pin nixpkgs testing
 résolu est 3ec636362e1816bc2f0888fa0fa2c69f1bc9e504 (noyau 6.18.58).
 Aucune compilation, validation matérielle, signature ou publication effectuée.
+
+
+## 2026-11-05 — deuxième variante noyau latest
+
+Demande utilisateur : ajouter un build linuxPackages_latest à côté du noyau
+actuel et permettre un futur choix dans GLF-OS. Argument racine kernelVariant
+("default" par défaut, ou "latest"), appliqué au packageSet complet, drivers,
+modulesTree et image enrichie. kernel.json reste linuxPackages_6_18.
+La CI testing utilise une matrice default/latest, artefacts et tags distincts ;
+les deux variantes sont obligatoires. Current reste indisponible.
+Les descripteurs/manifeste portent kernelVariant ; consommation signée refusée
+si la variante ne correspond pas. Compatibilité des anciens descripteurs
+associés à default conservée. Rétention inchangée : sept releases au total.
+Guide integration-glfos.md complété pour le futur sélecteur ; aucun GLF-OS modifié.
+
+Validation locale : évaluation testing-latest-packages réussie sans build,
+versions du lock temporaire local : default 6.18.58, latest 7.3. Tests du sélecteur,
+des tags, détection des releases, rétention, catalogue et consommateur signé
+réussis. Syntaxe bash et diff --check vérifiés.
+La préparation du shell testing-latest-ci échoue sur une dépendance amont
+config.guess (HTTP 404) : suite ci/check.sh complète non exécutée, compilation
+des noyaux/drivers et tests matériels non validés. Aucune signature ni publication.
+
+
+## 2026-11-05 — configuration noyau déplacée
+
+À la demande de l’utilisateur, kernel.json est déplacé dans pkgs/kernel/kernel.json.
+Il définit les deux variantes : default = linuxPackages_6_18, latest = linuxPackages_latest.
+select.nix et les métadonnées de ci/build.sh lisent cette même configuration ;
+aucun nom de famille noyau n’est codé en dur dans ces consommateurs.
+Les références antérieures au fichier racine dans cet historique sont obsolètes.

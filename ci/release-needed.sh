@@ -20,6 +20,7 @@ from release_tag import release_tag
 
 tag = release_tag({
     'profile': os.environ['GLF_CHANNEL'],
+    'kernelVariant': os.environ.get('GLF_KERNEL_VARIANT', 'default'),
     'branch': os.environ['GITHUB_REF_NAME'],
     'commit': os.environ['GITHUB_SHA'],
     'channels': channel_info(json.loads(Path('flake.lock').read_text()), os.environ['GLF_CHANNEL']),

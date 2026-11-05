@@ -13,7 +13,7 @@
 
   outputs = { self, nixpkgs, testing-nixpkgs, ... }:
     let
-      forChannel = nixpkgs:
+      forChannel = nixpkgs: kernelVariant:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -21,7 +21,7 @@
         config.allowUnfreePredicate = package:
           nixpkgs.lib.hasPrefix "nvidia" (nixpkgs.lib.getName package);
       };
-      sb = pkgs.callPackage ./default.nix {};
+      sb = pkgs.callPackage ./default.nix { inherit kernelVariant; };
       target = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit sb; };
@@ -72,8 +72,18 @@
         });
       };
     };
-      current = forChannel nixpkgs;
-      testing = forChannel testing-nixpkgs;
+      current = forChannel nixpkgs "default";
+      testingDefault = forChannel testing-nixpkgs "default";
+      testingLatest = forChannel testing-nixpkgs "latest";
+      latestAttrs = attrs: builtins.listToAttrs (map (name: {
+        name = "latest-${name}"; value = attrs.${name};
+      }) (builtins.attrNames attrs));
+      testing = testingDefault // {
+        packages.${system} = testingDefault.packages.${system} // latestAttrs testingLatest.packages.${system};
+        checks.${system} = testingDefault.checks.${system} // latestAttrs testingLatest.checks.${system};
+        devShells.${system} = testingDefault.devShells.${system} // latestAttrs testingLatest.devShells.${system};
+        legacyPackages.${system} = testingDefault.legacyPackages.${system} // { latest = testingLatest.legacyPackages.${system}; };
+      };
       system = "x86_64-linux";
       prefix = attrs: builtins.listToAttrs (map (name: {
         name = "testing-${name}"; value = attrs.${name};

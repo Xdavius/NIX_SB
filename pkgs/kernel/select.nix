@@ -1,13 +1,17 @@
-{ pkgs }:
+{ pkgs, kernelVariant ? "default" }:
 let
-  selection = builtins.fromJSON (builtins.readFile ../../kernel.json);
-  name = selection.package;
+  variants = builtins.fromJSON (builtins.readFile ./kernel.json);
+  valid = builtins.isAttrs variants
+    && builtins.attrNames variants == [ "default" "latest" ]
+    && builtins.all (name: builtins.isString variants.${name}) (builtins.attrNames variants);
+  name = if builtins.hasAttr kernelVariant variants then variants.${kernelVariant}
+    else throw "kernelVariant: variante inconnue: ${kernelVariant}";
 in
-if builtins.attrNames selection != [ "package" ] || !builtins.isString name then
-  throw "kernel.json: attendu un champ package de type chaine"
+if !valid then
+  throw "pkgs/kernel/kernel.json: attendu default et latest de type chaine"
 else if !(builtins.hasAttr name pkgs) then
-  throw "kernel.json: attribut nixpkgs inconnu: ${name}"
+  throw "pkgs/kernel/kernel.json: attribut nixpkgs inconnu: ${name}"
 else
   let selected = pkgs.${name};
   in if selected ? kernel && selected ? rebuildImage then selected
-  else throw "kernel.json: ${name} doit etre un ensemble kernelPackages avec rebuildImage"
+  else throw "pkgs/kernel/kernel.json: ${name} doit etre un ensemble kernelPackages avec rebuildImage"

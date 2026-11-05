@@ -3,6 +3,8 @@ set -euo pipefail
 flake_ref=${GLF_FLAKE_REF:-path:$PWD}
 profile=${GLF_CHANNEL:-current}
 case "$profile" in current) prefix="" ;; testing) prefix="testing-" ;; *) exit 1 ;; esac
+variant=${GLF_KERNEL_VARIANT:-default}
+case "$variant" in default) ;; latest) prefix="${prefix}latest-" ;; *) exit 1 ;; esac
 mkdir -p dist
 [[ ! -e dist/unsigned ]] || { echo "dist/unsigned existe deja" >&2; exit 1; }
 mkdir dist/unsigned
@@ -34,7 +36,8 @@ metadata = {
     "profile": os.environ.get("GLF_CHANNEL", "current"),
     "branch": os.environ["GLF_RELEASE_BRANCH"],
     "commit": os.environ["GLF_RELEASE_COMMIT"],
-    "kernel": json.loads(Path("kernel.json").read_text())["package"],
+    "kernelVariant": os.environ.get("GLF_KERNEL_VARIANT", "default"),
+    "kernel": json.loads(Path("pkgs/kernel/kernel.json").read_text())[os.environ.get("GLF_KERNEL_VARIANT", "default")],
     "nvidia": json.loads(Path("pkgs/drivers/nvidia/version.json").read_text())["version"],
     "nixpkgs": channels["nixpkgs"]["rev"],
     "channels": channels,

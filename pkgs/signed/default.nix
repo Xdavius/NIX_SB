@@ -1,9 +1,10 @@
 { lib, fetchurl, runCommand, python3, openssl, sbsigntool, jq
-, kernel, systemd, refind, rockyShim, releaseFile }:
+, kernel, systemd, refind, rockyShim, releaseFile, kernelVariant ? "default" }:
 let
   release = builtins.fromJSON (builtins.readFile releaseFile);
   valid = release.version == 2
     && builtins.match "[a-f0-9]{40}" release.commit != null
+    && (release.kernelVariant or "default") == kernelVariant
     && builtins.isString release.branch
     && builtins.elem release.profile [ "current" "testing" ];
   source = assert valid; fetchurl {
@@ -25,6 +26,7 @@ let
     test "$(jq -r .commit release.json)" = ${lib.escapeShellArg release.commit}
     test "$(jq -r .profile release.json)" = ${lib.escapeShellArg release.profile}
     test "$(jq -r .branch release.json)" = ${lib.escapeShellArg release.branch}
+    test "$(jq -r '.kernelVariant // "default"' release.json)" = ${lib.escapeShellArg kernelVariant}
     openssl x509 -in GLF.pem -outform DER -out actual.cer
     cmp actual.cer ${../../certificates/production/GLF.cer}
     cmp GLF.cer ${../../certificates/production/GLF.cer}
