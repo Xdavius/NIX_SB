@@ -14,7 +14,8 @@ class KernelVariantTests(unittest.TestCase):
             kernelVariant = VARIANT;
             pkgs = {
               linuxPackages_6_18 = { kernel = "stable"; rebuildImage = true; };
-              linuxPackages_latest = { kernel = "latest"; rebuildImage = true; };
+              linuxPackages_7_2 = { kernel = "7.2"; rebuildImage = true; };
+              linuxPackages_latest = { kernel = "upstream"; rebuildImage = true; };
             };
           };
         in selected.kernel'''.replace('SELECT', str(SELECT)).replace('VARIANT', json.dumps(variant))
@@ -22,7 +23,7 @@ class KernelVariantTests(unittest.TestCase):
                                '--expr', expression], capture_output=True, text=True)
 
     def test_selection(self):
-        for variant, expected in [('default', 'stable'), ('latest', 'latest')]:
+        for variant, expected in [('default', 'stable'), ('latest', '7.2'), ('upstream-latest', 'upstream')]:
             result = self.evaluate(variant)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(result.stdout), expected)

@@ -9,8 +9,9 @@ Ce dépôt centralise le choix du noyau nixpkgs, les définitions des drivers GL
 le catalogue de confiance et les outils de signature Secure Boot.
 
 - Deux variantes testing sont construites et publiées : `default` (famille de
-  `pkgs/kernel/kernel.json`) et `latest` (`linuxPackages_latest` du même channel).
-- `pkgs/kernel/kernel.json` : familles nixpkgs des variantes `default` et `latest`.
+  `pkgs/kernel/kernel.json`) et `latest` (famille `linuxPackages_7_2` du même channel).
+- `pkgs/kernel/kernel.json` : familles nixpkgs des variantes publiées `default` et `latest`,
+  plus `upstream-latest` réservé aux tests de régression.
 - `flake.lock` : fichier local/CI temporaire, ignore par Git ; les versions viennent des channels GLF-OS.
 - `pkgs/drivers/catalogue.json` : dix drivers approuvés, dont xonedo, xpad-noone et openrazer.
 - `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes, gérés ici.
@@ -56,3 +57,9 @@ Voir [le guide GLF-OS](integration-glfos.md) pour épingler une publication via
 
 Documentation : [drivers](docs/drivers.md), [architecture](docs/architecture.md),
 [signature](docs/SIGNING-SERVICE.md), [CI](docs/CI.md).
+
+Le workflow indépendant `kernel-regressions.yml` construit quotidiennement le vrai
+`linuxPackages_latest`, son image enrichie et tous les drivers du catalogue.
+Un échec reste visible dans Actions avec les logs, sans bloquer les releases
+6.18/7.2. Il ne signe et ne publie aucun composant. Le gel sur 7.2 concerne
+la famille du noyau ; ses versions correctives continuent de suivre le channel.

@@ -3,7 +3,8 @@
 ## Choisir le noyau dans NIX_SB
 
 `pkgs/kernel/kernel.json` contient les variantes `default` (`linuxPackages_6_18`)
-et `latest` (`linuxPackages_latest`). Changer la valeur d’une variante
+et `latest` (`linuxPackages_7_2`) publiées, ainsi que `upstream-latest`
+(`linuxPackages_latest`) réservé à la détection des régressions. Changer la valeur d’une variante
 pour choisir une autre famille disponible dans le nixpkgs du dépôt. Le patchlevel
 exact dépend du nixpkgs fourni par les channels GLF-OS. La CI NIX_SB doit
 reprendre cette révision. Son lock interne ne définit pas les versions GLF-OS.

@@ -75,14 +75,21 @@
       current = forChannel nixpkgs "default";
       testingDefault = forChannel testing-nixpkgs "default";
       testingLatest = forChannel testing-nixpkgs "latest";
+      testingUpstream = forChannel testing-nixpkgs "upstream-latest";
+      upstreamAttrs = attrs: builtins.listToAttrs (map (name: {
+        name = "upstream-latest-${name}"; value = attrs.${name};
+      }) (builtins.attrNames attrs));
       latestAttrs = attrs: builtins.listToAttrs (map (name: {
         name = "latest-${name}"; value = attrs.${name};
       }) (builtins.attrNames attrs));
       testing = testingDefault // {
-        packages.${system} = testingDefault.packages.${system} // latestAttrs testingLatest.packages.${system};
-        checks.${system} = testingDefault.checks.${system} // latestAttrs testingLatest.checks.${system};
-        devShells.${system} = testingDefault.devShells.${system} // latestAttrs testingLatest.devShells.${system};
-        legacyPackages.${system} = testingDefault.legacyPackages.${system} // { latest = testingLatest.legacyPackages.${system}; };
+        packages.${system} = testingDefault.packages.${system} // latestAttrs testingLatest.packages.${system} // upstreamAttrs testingUpstream.packages.${system};
+        checks.${system} = testingDefault.checks.${system} // latestAttrs testingLatest.checks.${system} // upstreamAttrs testingUpstream.checks.${system};
+        devShells.${system} = testingDefault.devShells.${system} // latestAttrs testingLatest.devShells.${system} // upstreamAttrs testingUpstream.devShells.${system};
+        legacyPackages.${system} = testingDefault.legacyPackages.${system} // {
+          latest = testingLatest.legacyPackages.${system};
+          upstream-latest = testingUpstream.legacyPackages.${system};
+        };
       };
       system = "x86_64-linux";
       prefix = attrs: builtins.listToAttrs (map (name: {

@@ -1,0 +1,73 @@
+name: Upstream latest kernel regressions
+on:
+  schedule:
+    - cron: '53 5 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'pkgs/kernel/**'
+      - 'pkgs/drivers/**'
+      - 'pkgs/modules-tree/**'
+      - 'pkgs/certificates/**'
+      - 'flake.nix'
+      - 'default.nix'
+      - '.github/workflows/kernel-regressions.yml'
+  pull_request:
+    paths:
+      - 'pkgs/kernel/**'
+      - 'pkgs/drivers/**'
+      - 'pkgs/modules-tree/**'
+      - 'pkgs/certificates/**'
+      - 'flake.nix'
+      - 'default.nix'
+      - '.github/workflows/kernel-regressions.yml'
+permissions:
+  contents: read
+concurrency:
+  group: upstream-latest-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  upstream-latest:
+    name: Build upstream latest kernel and drivers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - name: Resoudre les channels et identifier le noyau amont
+        run: |
+          mkdir -p dist/regressions
+          nix flake lock "path:$PWD" --refresh
+          cp flake.lock dist/regressions/flake.lock
+          python3 ci/channels.py --profile testing > dist/regressions/channels.json
+          nix eval --no-update-lock-file --raw "path:$PWD#legacyPackages.x86_64-linux.testing.upstream-latest.kernelPackages.kernel.version" > dist/regressions/kernel-version.txt
+          {
+            echo '### Regression du vrai linuxPackages_latest'
+            echo "Version : $(cat dist/regressions/kernel-version.txt)"
+            echo 'Construction du noyau et de tous les drivers approuves ; aucune signature ni publication.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Compiler le noyau et le catalogue complet
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix build --no-update-lock-file --keep-going --print-build-logs --no-link \
+            "path:$PWD#testing-upstream-latest-kernel" \
+            "path:$PWD#testing-upstream-latest-certificates" \
+            2>&1 | tee dist/regressions/build.log
+      - name: Conserver les diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: upstream-latest-regressions-${{ github.sha }}
+          path: dist/regressions/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Rapporter le resultat
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          echo "Resultat : $RESULT. Ce workflow est independant des releases default/latest et du controle obligatoire validate." >> "$GITHUB_STEP_SUMMARY"
