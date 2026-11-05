@@ -408,3 +408,11 @@ environnements glf-signing-production et glf-key-bootstrap ciblent main.
 Les conditions de signature/publication et la documentation suivent main ;
 Rising reste le nom de la version GLF-OS. Les références historiques à la
 branche Rising sont donc obsolètes. Aucun secret ni workflow de signature déclenché.
+
+
+## 2026-11-05 — correction du test de détection des releases latest
+
+La CI de la PR #15 passe sur default, mais échoue sur latest dans
+test_release_needed : héritage de GLF_KERNEL_VARIANT=latest avec une fixture
+de tag default. Le test fixe explicitement sa variante et couvre les deux,
+y compris le refus de réutiliser une release de l’autre variante.
