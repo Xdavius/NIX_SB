@@ -5,6 +5,9 @@ on:
       profile:
         type: string
         required: true
+      build-needed:
+        type: boolean
+        required: true
       kernel-variant:
         type: string
         default: default
@@ -15,35 +18,7 @@ env:
   GLF_CHANNEL: ${{ inputs.profile }}
   GLF_SHELL: ${{ inputs.kernel-variant == 'latest' && 'testing-latest-ci' || inputs.profile == 'testing' && 'testing-ci' || 'ci' }}
 jobs:
-  resolve:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    outputs:
-      needed: ${{ steps.release.outputs.needed }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
-      - name: Resoudre les channels une seule fois pour ce parcours
-        run: |
-          nix flake lock "path:$PWD" --refresh
-          python3 ci/channels.py --profile current
-          python3 ci/channels.py --profile testing
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: resolved-lock-${{ inputs.profile }}-${{ inputs.kernel-variant }}
-          path: flake.lock
-          if-no-files-found: error
-          retention-days: 7
-      - name: Detecter une publication deja disponible
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash ci/release-needed.sh
-
   validate:
-    needs: resolve
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -53,13 +28,13 @@ jobs:
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
       - uses: actions/download-artifact@v4
         with:
-          name: resolved-lock-${{ inputs.profile }}-${{ inputs.kernel-variant }}
+          name: resolved-lock-${{ inputs.profile }}
           path: .
       - run: nix develop --no-update-lock-file "path:$PWD#$GLF_SHELL" --command bash ci/check.sh
 
   build:
-    if: github.event_name != 'pull_request' && needs.resolve.outputs.needed == 'true'
-    needs: [resolve, validate]
+    if: github.event_name != 'pull_request' && inputs.build-needed
+    needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -69,7 +44,7 @@ jobs:
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
       - uses: actions/download-artifact@v4
         with:
-          name: resolved-lock-${{ inputs.profile }}-${{ inputs.kernel-variant }}
+          name: resolved-lock-${{ inputs.profile }}
           path: .
       - run: bash ci/build.sh
       - name: Identifier la version GLF-OS
@@ -100,7 +75,7 @@ jobs:
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
       - uses: actions/download-artifact@v4
         with:
-          name: resolved-lock-${{ inputs.profile }}-${{ inputs.kernel-variant }}
+          name: resolved-lock-${{ inputs.profile }}
           path: .
       - name: Identifier la version GLF-OS
         id: version
@@ -129,25 +104,3 @@ jobs:
           path: dist/release/
           if-no-files-found: error
           retention-days: 7
-
-  publish:
-    needs: sign
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    concurrency:
-      group: glf-secureboot-publication
-      cancel-in-progress: false
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: signed-${{ inputs.profile }}-${{ inputs.kernel-variant }}-${{ github.sha }}
-          path: dist/release/
-      - name: Publier sans remplacer une version existante
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash ci/publish-release.sh

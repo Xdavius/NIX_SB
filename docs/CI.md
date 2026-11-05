@@ -28,8 +28,8 @@ pour les deux profils. Le job de publication a contents:write sans clé privée.
 Le shim Rocky est conservé intact ; seuls noyau et systemd-boot sont signés GLF.
 
 Les artefacts et releases portent le profil pour empêcher leur mélange :
-`secureboot-PROFIL-HASH_BRANCHE-COMMIT-HASH_CHANNELS`. Le descripteur release.json contient
-`profile`, `branch`, `commit`, `url`, `archiveHash` et `hash`. Le manifeste build.json trace le
+`secureboot-PROFIL-bundle-HASH_BRANCHE-COMMIT-HASH_CHANNELS`. Chaque descripteur contient
+`profile`, `branch`, `commit`, `url`, `archiveHash` et `hash`. Le manifeste `build-default.json` ou `build-latest.json` trace le
 dépôt channels, son commit et les pins nixpkgs/unstable. La release reste draft
 jusqu’à la fin des uploads. Aucun remplacement automatique d’une release existante.
 Lors de sa publication, la CI marque explicitement la release « Latest » afin
@@ -68,7 +68,7 @@ omis. Une erreur de l'API GitHub fait echouer le controle. Un changement du chan
 peut donc produire une nouvelle release au meme commit NIX_SB, sans PR ni commit
 automatique. Les definitions locales des pilotes restent maintenues dans le depot.
 
-Le lock utilise est conserve dans l'archive signee ; `build.json` trace les
+Le lock utilise est conserve dans chaque archive signee ; `build-default.json` et `build-latest.json` tracent les
 revisions. Pour reproduire une release, utiliser son commit NIX_SB et extraire
 son `flake.lock` a la racine avant d'executer les commandes avec `path:$PWD`.
 GLF-OS doit utiliser les memes revisions de channels pour consommer cette release.
@@ -112,3 +112,23 @@ les définitions concernées. Aucun secret de signature, aucune release.
 Le job échoue visiblement en cas de régression, mais n'est pas une dépendance
 du workflow de publication ni du contrôle obligatoire `validate`.
 Il vérifie la compilation ; il ne valide pas le chargement sur matériel.
+
+
+## Une release commune aux deux noyaux
+
+Un seul job `resolve` fournit le même lock aux deux variantes de la matrice.
+`channel.yml` valide, construit, signe et prépare les fichiers de chaque variante,
+avec des permissions de lecture uniquement. Le job `publish` du workflow parent,
+seul détenteur de `contents:write`, attend la réussite des deux parcours et
+vérifie leurs commit, branche, profil, pins, variantes, URLs et hashes d'archive.
+Il crée ensuite une seule release draft contenant :
+
+- `glf-secureboot-default.tar.gz`, `release-default.json`, `build-default.json` ;
+- `glf-secureboot-latest.tar.gz`, `release-latest.json`, `build-latest.json`.
+
+La promotion publique avec le badge « Latest » intervient après tous les uploads.
+Un build ou une signature manquante empêche la publication entière. Une release
+publique existante n'est réutilisée que si les six fichiers sont présents ; une
+release incomplète provoque une erreur explicite. Le préfixe `bundle` distingue
+ce format des publications historiques par variante, toujours reconnues par
+la rétention globale de sept releases. Le suivi upstream reste indépendant.

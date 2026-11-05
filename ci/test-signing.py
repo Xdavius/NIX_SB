@@ -62,13 +62,13 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     assert Path('dist/signed/mmx64.efi').read_bytes() == stub.read_bytes()
     assert not Path('dist/signed/glf-os.efi').exists()
     run(['bash', str(repo / 'ci/package-release.sh')], env={**env, 'GITHUB_REPOSITORY': 'Xdavius/NIX_SB'})
-    descriptor = json.loads(Path('dist/release/release.json').read_text())
+    descriptor = json.loads(Path('dist/release/release-default.json').read_text())
     assert descriptor['hash'].startswith('sha256-')
     assert descriptor['version'] == 2
-    assert descriptor['archiveHash'] == run(['nix', 'hash', 'file', 'dist/release/glf-secureboot.tar.gz']).strip()
+    assert descriptor['archiveHash'] == run(['nix', 'hash', 'file', 'dist/release/glf-secureboot-default.tar.gz']).strip()
     assert descriptor['commit'] == 'a' * 40
     Path('unpacked').mkdir()
-    run(['tar', '-xzf', 'dist/release/glf-secureboot.tar.gz', '-C', 'unpacked'])
+    run(['tar', '-xzf', 'dist/release/glf-secureboot-default.tar.gz', '-C', 'unpacked'])
     assert Path('unpacked/flake.lock').read_bytes() == (unsigned / 'flake.lock').read_bytes()
     assert run(['nix', 'hash', 'path', 'unpacked']).strip() == descriptor['hash']
     # Build the actual package expression in an isolated tree with a disposable
@@ -87,10 +87,10 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
     shutil.copyfile(stub, fixture / 'systemd/lib/systemd/boot/efi/systemd-bootx64.efi')
     for name in ('shimx64.efi', 'mmx64.efi'):
         shutil.copyfile(stub, fixture / 'shim/share/efi' / name)
-    archive = run(['nix', 'store', 'add-file', str(Path('dist/release/glf-secureboot.tar.gz').resolve())]).strip()
+    archive = run(['nix', 'store', 'add-file', str(Path('dist/release/glf-secureboot-default.tar.gz').resolve())]).strip()
     descriptor['url'] = 'file://' + archive
     (fixture / 'release.json').write_text(json.dumps(descriptor))
-    shutil.copyfile('dist/release/glf-secureboot.tar.gz', fixture / 'archive.tar.gz')
+    shutil.copyfile('dist/release/glf-secureboot-default.tar.gz', fixture / 'archive.tar.gz')
     nixpkgs = json.dumps(os.environ['GLF_TEST_NIXPKGS'])
     (fixture / 'check.nix').write_text(f'''let
   pkgs = import (builtins.toPath {nixpkgs}) {{ system = "x86_64-linux"; }};
@@ -105,6 +105,18 @@ with tempfile.TemporaryDirectory(prefix="glf-sign-test-") as temp:
 in signed.bundle
 ''')
     run(['nix', 'build', '--file', str(fixture / 'check.nix'), '--no-link'])
+    # Package the second variant into the same release and verify their identity.
+    metadata = json.loads(Path('dist/signed/release.json').read_text())
+    metadata['kernelVariant'] = 'latest'
+    Path('dist/signed/release.json').write_text(json.dumps(metadata))
+    signed = Path('dist/signed')
+    (signed / 'SHA256SUMS').write_text(''.join(
+        f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+        for path in sorted(signed.iterdir()) if path.name != 'SHA256SUMS'
+    ))
+    run(['bash', str(repo / 'ci/package-release.sh')], env={**env, 'GITHUB_REPOSITORY': 'Xdavius/NIX_SB'})
+    run([sys.executable, '-m', 'ci.release_bundle', 'dist/release'],
+        env={**env, 'PYTHONPATH': str(repo)})
     run(["bash", str(repo / "ci/attic-mock.sh")])
     report = json.loads(Path("dist/attic-mock.json").read_text())
     assert report["mode"] == "mock" and report["uploaded"] is False

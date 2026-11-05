@@ -439,3 +439,29 @@ Compilation réelle NVIDIA 615.71.09 réussie sur 7.2.12. Après actualisation d
 lock temporaire, testing 31ecbaca résout latest vers 7.2.13 et upstream-latest
 vers 7.3 ; contrat Nix testing-latest-packages évalué avec succès.
 Aucune signature de production ni publication effectuée pendant cette correction.
+
+## 2026-11-05 — une release commune avec deux archives
+
+Correction explicite de l’utilisateur : les deux noyaux doivent être dans la
+même release GitHub marquée Latest. La CI résout maintenant un lock commun en
+amont de la matrice default/latest. Les deux parcours ne font que valider,
+construire, signer et préparer leurs artefacts. Un seul job publish attend leur
+réussite et publie glf-secureboot-default.tar.gz et glf-secureboot-latest.tar.gz,
+avec release-default.json/release-latest.json et build-default.json/build-latest.json.
+
+Tag commun secureboot-testing-bundle-... ; commit, branche, profil et pins doivent
+être identiques. Le hash de chaque archive et son URL sont vérifiés avant toute
+création de release. Publication draft puis promotion publique/Latest après les
+six uploads ; aucune publication partielle si un noyau manque ou échoue.
+Détection d’une release existante seulement si les six fichiers sont présents,
+erreur explicite en cas de release publique incomplète. Aucun remplacement des
+anciennes releases. La rétention reconnaît les anciens et nouveaux tags et
+conserve sept releases au total. Le consommateur épingle le descripteur de sa
+variante ; son API et les anciens descripteurs restent compatibles.
+Le workflow de régression upstream reste indépendant et sans publication.
+
+Contrôles ciblés : 24 tests de tags, détection, bundle/publication simulée et
+rétention réussis ; actionlint, shellcheck et git diff --check réussis.
+La publication simulée vérifie l’upload des deux variantes avant promotion et
+l’absence d’appel API si une archive manque. Aucun appel de publication réel
+ni usage d’une clé de production pendant cette refonte.
