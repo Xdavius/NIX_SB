@@ -432,9 +432,9 @@ Les choix Windows, récupération et autres disques sont conservés. Toutes les
 
 NIX_SB publie deux variantes indépendantes sur testing. `default` conserve
 la famille de `pkgs/kernel/kernel.json` (`linuxPackages_6_18`) ; `latest` utilise
-`linuxPackages_latest` fourni par le même nixpkgs GLF. Latest n'est pas un
-channel supplémentaire : sa version dépend du pin nixpkgs résolu. Les deux
-variantes peuvent donc temporairement désigner la même version.
+`linuxPackages_7_2` fourni par le même nixpkgs GLF. La variante publiée `latest`
+est temporairement figée sur la famille 7.2 pour éviter la régression de
+compilation NVIDIA avec 7.3. Ses versions correctives suivent le channel.
 
 Le futur sélecteur GLF-OS doit fournir le choix au packageSet entier :
 
@@ -463,3 +463,11 @@ certificats, drivers et contrôles respectifs. Pour les scripts CI, utiliser
 obligatoires dans la CI ; current reste explicitement indisponible.
 Les releases latest portent le préfixe `secureboot-testing-latest-` ;
 la rétention existante de sept releases au total couvre les deux variantes.
+
+
+Le vrai `linuxPackages_latest` est suivi par `upstream-latest` dans le même
+fichier JSON. Le workflow séparé `kernel-regressions.yml` construit le noyau
+et tous les drivers chaque jour, sur demande et lors des changements concernés.
+Son résultat et ses logs permettent de repérer les régressions et leur correction.
+Il n'est pas requis par `validate` et ne bloque pas les deux releases publiées.
+Cette variante n'a ni release signée ni descripteur à sélectionner dans GLF-OS.

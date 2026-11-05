@@ -30,8 +30,9 @@ class ReleaseTagTests(unittest.TestCase):
                          release_tag({**self.metadata, 'kernelVariant': 'default'}))
 
     def test_invalid_variant_rejected(self):
-        with self.assertRaises(ValueError):
-            release_tag({**self.metadata, 'kernelVariant': 'typo'})
+        for variant in ('typo', 'upstream-latest'):
+            with self.subTest(variant=variant), self.assertRaises(ValueError):
+                release_tag({**self.metadata, 'kernelVariant': variant})
 
     def test_invalid_metadata_rejected(self):
         with self.assertRaises(ValueError):

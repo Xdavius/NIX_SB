@@ -1,4 +1,5 @@
 {
   "default": "linuxPackages_6_18",
-  "latest": "linuxPackages_latest"
+  "latest": "linuxPackages_7_2",
+  "upstream-latest": "linuxPackages_latest"
 }

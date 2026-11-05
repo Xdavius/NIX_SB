@@ -92,3 +92,23 @@ GLF_CHANNEL=testing nix develop "path:$PWD#testing-ci" --no-update-lock-file --c
 celles du checkout GLF-OS correspondant. Les commandes sans rafraichissement
 reutilisent le lock local ignore ; relancer la commande update pour suivre les
 nouveautes des channels.
+
+
+## Suivi du vrai dernier noyau
+
+La variante publiée `latest` reste sur `linuxPackages_7_2`, à côté de
+`default` (`linuxPackages_6_18`). `pkgs/kernel/kernel.json` déclare aussi
+`upstream-latest = linuxPackages_latest` pour les tests uniquement.
+
+`kernel-regressions.yml` résout les channels testing une fois, puis construit
+`testing-upstream-latest-kernel` et `testing-upstream-latest-certificates`.
+Ces sorties dépendent de tous les drivers du catalogue. `--keep-going` permet
+de continuer les constructions indépendantes après un premier échec, et
+`--print-build-logs` conserve les erreurs de compilation dans l'artefact
+avec la version noyau, les pins channels et le lock résolu.
+
+Exécution quotidienne à 05:53 UTC, manuelle, ou sur push main/PR touchant
+les définitions concernées. Aucun secret de signature, aucune release.
+Le job échoue visiblement en cas de régression, mais n'est pas une dépendance
+du workflow de publication ni du contrôle obligatoire `validate`.
+Il vérifie la compilation ; il ne valide pas le chargement sur matériel.

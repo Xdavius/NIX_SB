@@ -416,3 +416,26 @@ La CI de la PR #15 passe sur default, mais échoue sur latest dans
 test_release_needed : héritage de GLF_KERNEL_VARIANT=latest avec une fixture
 de tag default. Le test fixe explicitement sa variante et couvre les deux,
 y compris le refus de réutiliser une release de l’autre variante.
+
+## 2026-11-05 — latest publié en 7.2, suivi séparé du vrai latest
+
+À la demande de l’utilisateur après l’échec NVIDIA 615.71.09 sur 7.3,
+la variante publiée latest est figée sur la famille linuxPackages_7_2.
+Les versions correctives continuent de suivre le nixpkgs du channel GLF.
+Le fichier pkgs/kernel/kernel.json déclare aussi upstream-latest, qui suit
+linuxPackages_latest ; default reste linuxPackages_6_18.
+
+Le workflow indépendant kernel-regressions.yml construit le vrai latest et
+le catalogue complet via testing-upstream-latest-kernel/certificates, avec
+--keep-going et les logs de build. Exécution quotidienne, manuelle ou sur
+changement des définitions noyau/drivers. Lock et diagnostics conservés sept
+jours. Un échec est visible mais ne bloque pas validate ni les releases.
+Aucun accès aux secrets, aucune signature/publication pour upstream-latest.
+Les tags de release continuent de refuser cette variante de test.
+
+Validation : suite ci/check.sh complète réussie sur le lock local précédent,
+actionlint/shellcheck, contrôles Nix et tests de signature avec clé jetable inclus.
+Compilation réelle NVIDIA 615.71.09 réussie sur 7.2.12. Après actualisation du
+lock temporaire, testing 31ecbaca résout latest vers 7.2.13 et upstream-latest
+vers 7.3 ; contrat Nix testing-latest-packages évalué avec succès.
+Aucune signature de production ni publication effectuée pendant cette correction.
