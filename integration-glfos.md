@@ -33,7 +33,7 @@ Le client `glf-secureboot-sign` et son workflow de demandes sont supprimés.
 
 La CI de chaque branche construit les composants. La signature exige une branche
 protégée, `GLF_SIGNING_ENABLED=true` et une branche autorisée dans l’environnement
-`glf-signing-production` (actuellement Rising). Le shim Rocky n’est pas resigné.
+`glf-signing-production` (actuellement main). Le shim Rocky n’est pas resigné.
 
 Chaque release publique contient :
 
@@ -64,7 +64,7 @@ Dans `modules/glf-apps/flake.nix`, ajouter seulement une source :
 
 ```nix
 inputs.nix-sb-source = {
-  url = "git+https://github.com/Xdavius/NIX_SB.git?ref=Rising";
+  url = "git+https://github.com/Xdavius/NIX_SB.git?ref=main";
   flake = false;
 };
 ```
@@ -411,7 +411,7 @@ Sans ces informations, le libelle du bootspec reste le secours.
 `sb.boot-tools.glfInstallerApi = 1` annonce la prise en charge native de la
 migration EFI et de la politique noyau du consommateur. GLF-OS peut utiliser ce
 paquet directement, sans appliquer ses anciens patches. Ce marqueur doit être
-lu sur le paquet issu du commit de la release signée, pas sur la tête de Rising.
+lu sur le paquet issu du commit de la release signée, pas sur la tête de main.
 
 L’installateur copie `certificateDer` dans `EFI/GLF/GLF.cer` pour l’enrôlement
 manuel MokManager. Pour les anciennes configurations JSON, le chemin par défaut

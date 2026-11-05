@@ -16,7 +16,7 @@ GLF est livré au format PEM et DER. Le consommateur utilise le certificat
 épinglé dans NIX_SB, jamais une confiance déduite de la seule réponse téléchargée.
 
 Le job `sign` exige une branche protégée et `GLF_SIGNING_ENABLED=true` ;
-l’environnement autorise actuellement Rising, sans approbation manuelle pour
+l’environnement autorise actuellement main, sans approbation manuelle pour
 chaque publication. Une nouvelle branche doit y être explicitement autorisée.
 La clé existante est commune aux versions ; ne pas relancer le bootstrap.
 

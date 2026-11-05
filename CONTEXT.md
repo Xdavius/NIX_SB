@@ -365,3 +365,15 @@ de checks.x86_64-linux.testing-packages.drvPath réussie sans build après
 résolution des channels dans le lock temporaire ignoré. Le pin nixpkgs testing
 résolu est 3ec636362e1816bc2f0888fa0fa2c69f1bc9e504 (noyau 6.18.58).
 Aucune compilation, validation matérielle, signature ou publication effectuée.
+
+
+## 2026-11-05 — branche par défaut main
+
+À la demande de l’utilisateur, Rising est renommée main et main devient la
+branche par défaut GitHub. L’ancienne main est conservée sous
+main-archive-2026-11-05. La protection validate obligatoire, enforce_admins
+et le refus des force-push sont conservés. Les restrictions de branche des
+environnements glf-signing-production et glf-key-bootstrap ciblent main.
+Les conditions de signature/publication et la documentation suivent main ;
+Rising reste le nom de la version GLF-OS. Les références historiques à la
+branche Rising sont donc obsolètes. Aucun secret ni workflow de signature déclenché.
