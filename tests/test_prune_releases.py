@@ -37,6 +37,12 @@ class PruneReleasesTests(unittest.TestCase):
         self.assertEqual(obsolete_releases(releases, releases[-1]['tag_name']),
                          [release(1)['tag_name']])
 
+    def test_bundle_format_shares_retention_with_old_releases(self):
+        releases = [release(n) for n in range(1, 9)]
+        releases[-1]['tag_name'] = releases[-1]['tag_name'].replace('testing-', 'testing-bundle-')
+        self.assertEqual(obsolete_releases(releases, releases[-1]['tag_name']),
+                         [release(1)['tag_name']])
+
     def test_current_publication_protected(self):
         releases = [release(n) for n in range(1, 10)]
         self.assertEqual(obsolete_releases(releases, release(1)['tag_name']),

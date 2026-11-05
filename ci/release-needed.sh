@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, 'ci')
 from channels import channel_info
 from release_tag import release_tag
+from ci.release_bundle import REQUIRED_ASSETS
 
 tag = release_tag({
     'profile': os.environ['GLF_CHANNEL'],
@@ -26,7 +27,11 @@ tag = release_tag({
     'channels': channel_info(json.loads(Path('flake.lock').read_text()), os.environ['GLF_CHANNEL']),
 })
 releases = json.loads(Path(sys.argv[1]).read_text())
-exists = any(r['tag_name'] == tag and not r['draft'] for page in releases for r in page)
+matches = [r for page in releases for r in page if r['tag_name'] == tag and not r['draft']]
+for release in matches:
+    if not REQUIRED_ASSETS <= {asset['name'] for asset in release.get('assets', [])}:
+        raise SystemExit('Release publique incomplete : les deux variantes sont requises')
+exists = bool(matches)
 print('needed=' + ('false' if exists else 'true'))
 print(f'Publication {tag}: ' + ('deja disponible' if exists else 'a construire'), file=sys.stderr)
 PY

@@ -14,12 +14,11 @@ def release_tag(metadata):
     variant = metadata.get('kernelVariant', 'default')
     if variant not in ('default', 'latest'):
         raise ValueError('Variante noyau invalide')
-    suffix = '-latest' if variant == 'latest' else ''
     branch = hashlib.sha256(metadata['branch'].encode()).hexdigest()[:12]
     channels = hashlib.sha256(json.dumps(
         metadata['channels'], sort_keys=True, separators=(',', ':')
     ).encode()).hexdigest()
-    return f'secureboot-{profile}{suffix}-{branch}-{commit}-{channels}'
+    return f'secureboot-{profile}-bundle-{branch}-{commit}-{channels}'
 
 
 if __name__ == '__main__':

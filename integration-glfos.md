@@ -37,11 +37,18 @@ protégée, `GLF_SIGNING_ENABLED=true` et une branche autorisée dans l’enviro
 
 Chaque release publique contient :
 
-- `glf-secureboot.tar.gz` : noyau signé, systemd-boot signé, rEFInd signé, shim, MokManager,
-  certificat GLF PEM/DER, certificats des modules et manifestes.
-- `release.json` : URL, `archiveHash` pour le téléchargement, hash NAR décompressé
-  pour diagnostic, profil, branche et commit (format v2).
-- `build.json` : versions et révisions de la construction.
+| Variante | Archive | Descripteur à épingler | Métadonnées |
+| --- | --- | --- | --- |
+| `default` (6.18) | `glf-secureboot-default.tar.gz` | `release-default.json` | `build-default.json` |
+| `latest` (7.2) | `glf-secureboot-latest.tar.gz` | `release-latest.json` | `build-latest.json` |
+
+Chaque archive contient son noyau signé, systemd-boot, rEFInd, shim, MokManager,
+le certificat GLF PEM/DER, les certificats des modules et les manifestes.
+Chaque descripteur porte l'URL de son archive, `archiveHash`, le hash NAR,
+la variante, le profil, la branche et le commit (format v2).
+Les deux noyaux partagent le même commit et exactement les mêmes pins channels.
+La release n'est rendue publique et marquée « Latest » qu'après les deux builds,
+les deux signatures et l'upload des six fichiers. Aucune release partielle.
 
 Le tag contient le profil, le hash du nom de branche, le commit complet et
 l’empreinte des revisions du channel. La publication
@@ -70,8 +77,9 @@ inputs.nix-sb-source = {
 ```
 
 Le lock qui résout la sous-flake `glf-apps` fixe le commit source. Après publication,
-versionner son descripteur dans `modules/glf-apps/secureboot/release.json` et
-épingler le même commit que `release.json.commit`. Les revisions exactes des channels utilisees sont disponibles dans `build.json`
+choisir `release-default.json` ou `release-latest.json`, puis versionner ce
+descripteur sous le nom local `release.json` dans `modules/glf-apps/secureboot/release.json` et
+épingler le même commit que `release.json.commit`. Les revisions exactes des channels utilisees sont disponibles dans `build-default.json` ou `build-latest.json`
 et le lock temporaire inclus dans l’archive de la release.
 
 Dans l’overlay existant de `glf-apps`, ajouter les attributs suivants en rendant
@@ -373,7 +381,7 @@ Voir [la configuration et les conditions d'activation](docs/CI.md#channels-mouva
 Pour chaque version GLF-OS : branche NIX_SB protégée et autorisée dans
 l’environnement de signature. Publier après la CI, puis mettre à jour ensemble
 les révisions de channels, le commit source résolu pour `glf-apps` et le
-descripteur `release.json`. Aucun poste ne déclenche de
+descripteur `release-default.json` ou `release-latest.json`. Aucun poste ne déclenche de
 signature. Les anciens descripteurs restent utilisables tant que leurs releases
 et les sources Nix restent disponibles.
 
@@ -430,7 +438,7 @@ Les choix Windows, récupération et autres disques sont conservés. Toutes les
 
 ## Choix entre le noyau par défaut et latest
 
-NIX_SB publie deux variantes indépendantes sur testing. `default` conserve
+NIX_SB publie deux variantes dans une même release testing. `default` conserve
 la famille de `pkgs/kernel/kernel.json` (`linuxPackages_6_18`) ; `latest` utilise
 `linuxPackages_7_2` fourni par le même nixpkgs GLF. La variante publiée `latest`
 est temporairement figée sur la famille 7.2 pour éviter la régression de
@@ -445,7 +453,7 @@ sb = pkgs.callPackage sourceNixSb {
 };
 ```
 
-Le descripteur doit provenir de la release de la variante choisie, avec le
+Le descripteur doit correspondre à la variante choisie dans la release commune, avec le
 même profil et les mêmes pins channels. Les nouvelles releases indiquent
 `kernelVariant` dans leur descripteur et leur manifeste ; le consommateur
 refuse une variante incompatible. Les anciens descripteurs sans ce champ
@@ -461,13 +469,15 @@ Sorties internes : `testing-kernel` et `testing-latest-kernel`, avec leurs
 certificats, drivers et contrôles respectifs. Pour les scripts CI, utiliser
 `GLF_CHANNEL=testing GLF_KERNEL_VARIANT=latest`. Les deux variantes sont
 obligatoires dans la CI ; current reste explicitement indisponible.
-Les releases latest portent le préfixe `secureboot-testing-latest-` ;
-la rétention existante de sept releases au total couvre les deux variantes.
+Le tag commun porte le préfixe `secureboot-testing-bundle-` ;
+la rétention conserve sept releases au total, chacune avec les deux variantes.
+Les anciens tags et descripteurs restent utilisables tant que leurs releases
+sont conservées ; leurs fichiers ne sont pas remplacés.
 
 
 Le vrai `linuxPackages_latest` est suivi par `upstream-latest` dans le même
 fichier JSON. Le workflow séparé `kernel-regressions.yml` construit le noyau
 et tous les drivers chaque jour, sur demande et lors des changements concernés.
 Son résultat et ses logs permettent de repérer les régressions et leur correction.
-Il n'est pas requis par `validate` et ne bloque pas les deux releases publiées.
+Il n'est pas requis par `validate` et ne bloque pas la release commune des deux variantes.
 Cette variante n'a ni release signée ni descripteur à sélectionner dans GLF-OS.

@@ -10,6 +10,7 @@ le catalogue de confiance et les outils de signature Secure Boot.
 
 - Deux variantes testing sont construites et publiées : `default` (famille de
   `pkgs/kernel/kernel.json`) et `latest` (famille `linuxPackages_7_2` du même channel).
+  Une seule release GitHub « Latest » contient les deux archives et leurs descripteurs.
 - `pkgs/kernel/kernel.json` : familles nixpkgs des variantes publiées `default` et `latest`,
   plus `upstream-latest` réservé aux tests de régression.
 - `flake.lock` : fichier local/CI temporaire, ignore par Git ; les versions viennent des channels GLF-OS.

@@ -18,16 +18,16 @@ class ReleaseTagTests(unittest.TestCase):
         self.assertEqual(release_tag(self.metadata), release_tag(other))
 
     def test_each_source_change_has_its_own_release(self):
-        for field, value in [('commit', 'd' * 40), ('branch', 'Next'), ('profile', 'current'), ('kernelVariant', 'latest')]:
+        for field, value in [('commit', 'd' * 40), ('branch', 'Next'), ('profile', 'current')]:
             other = {**self.metadata, field: value}
             self.assertNotEqual(release_tag(self.metadata), release_tag(other))
         other = copy.deepcopy(self.metadata)
         other['channels']['nixpkgs']['rev'] = 'e' * 40
         self.assertNotEqual(release_tag(self.metadata), release_tag(other))
 
-    def test_legacy_default_tag_preserved(self):
+    def test_variants_share_one_tag(self):
         self.assertEqual(release_tag(self.metadata),
-                         release_tag({**self.metadata, 'kernelVariant': 'default'}))
+                         release_tag({**self.metadata, 'kernelVariant': 'latest'}))
 
     def test_invalid_variant_rejected(self):
         for variant in ('typo', 'upstream-latest'):

@@ -20,17 +20,42 @@ jobs:
           echo "::warning::Canal current indisponible : rebuildImage absent. Aucune construction, signature ou publication current."
           echo "### Current : indisponible" >> "$GITHUB_STEP_SUMMARY"
           echo "Exception temporaire autorisee : seule la reussite de testing conditionne la fusion. Aucun artefact current n'est publie." >> "$GITHUB_STEP_SUMMARY"
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      needed: ${{ steps.release.outputs.needed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
+      - name: Resoudre un lock commun aux deux noyaux
+        run: |
+          nix flake lock "path:$PWD" --refresh
+          python3 ci/channels.py --profile testing
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resolved-lock-testing
+          path: flake.lock
+          if-no-files-found: error
+          retention-days: 7
+      - name: Detecter la release commune
+        id: release
+        env:
+          GLF_CHANNEL: testing
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/release-needed.sh
   testing:
+    needs: resolve
     strategy:
       fail-fast: false
       matrix:
         kernel-variant: [default, latest]
-    # Le workflow appele restreint ce droit au seul job de publication.
-    permissions:
-      contents: write
     uses: ./.github/workflows/channel.yml
     with:
       profile: testing
+      build-needed: ${{ needs.resolve.outputs.needed == 'true' }}
       kernel-variant: ${{ matrix.kernel-variant }}
     secrets: inherit
   validate:
@@ -42,3 +67,32 @@ jobs:
         env:
           RESULT: ${{ needs.testing.result }}
         run: test "$RESULT" = success
+
+  publish:
+    needs: [resolve, testing]
+    if: >-
+      github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
+      github.ref_protected && vars.GLF_SIGNING_ENABLED == 'true' &&
+      needs.resolve.outputs.needed == 'true'
+    concurrency:
+      group: glf-secureboot-publication
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-testing-default-${{ github.sha }}
+          path: dist/release/
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-testing-latest-${{ github.sha }}
+          path: dist/release/
+      - name: Publier les deux noyaux dans une seule release Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/publish-release.sh

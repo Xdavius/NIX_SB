@@ -8,6 +8,7 @@ import unittest
 
 from ci.channels import channel_info
 from ci.release_tag import release_tag
+from ci.release_bundle import REQUIRED_ASSETS
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,14 +43,11 @@ class ReleaseNeededTests(unittest.TestCase):
                 tag = release_tag({'profile': 'testing', 'branch': 'Rising',
                                    'commit': 'c' * 40, 'kernelVariant': variant,
                                    'channels': channel_info(lock, 'testing')})
-                other_tag = release_tag({'profile': 'testing', 'branch': 'Rising',
-                                         'commit': 'c' * 40,
-                                         'kernelVariant': 'latest' if variant == 'default' else 'default',
-                                         'channels': channel_info(lock, 'testing')})
-                cases = [([], 'true'), ([{'tag_name': tag, 'draft': False}], 'false'),
+                assets = [{'name': name} for name in REQUIRED_ASSETS]
+                cases = [([], 'true'),
+                         ([{'tag_name': tag, 'draft': False, 'assets': assets}], 'false'),
                          ([{'tag_name': tag, 'draft': True}], 'true'),
-                         ([{'tag_name': tag + '-old', 'draft': False}], 'true'),
-                         ([{'tag_name': other_tag, 'draft': False}], 'true')]
+                         ([{'tag_name': tag + '-old', 'draft': False}], 'true')]
                 for releases, needed in cases:
                     with self.subTest(variant=variant, releases=releases):
                         output.write_text('')
@@ -58,6 +56,16 @@ class ReleaseNeededTests(unittest.TestCase):
                                                 cwd=work, env=env, capture_output=True, text=True)
                         self.assertEqual(result.returncode, 0, result.stderr)
                         self.assertEqual(output.read_text(), f'needed={needed}\n')
+            # A public release missing one archive must never count as complete.
+            output.write_text('')
+            (work / 'releases.json').write_text(json.dumps([[{
+                'tag_name': tag, 'draft': False, 'assets': assets[:-1],
+            }]]))
+            result = subprocess.run(['bash', str(ROOT / 'ci/release-needed.sh')],
+                                    cwd=work, env=env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('incomplete', result.stderr)
+            self.assertEqual(output.read_text(), '')
             output.write_text('')
             result = subprocess.run(['bash', str(ROOT / 'ci/release-needed.sh')],
                                     cwd=work, env={**env, 'MOCK_EXIT': '1'}, capture_output=True)
