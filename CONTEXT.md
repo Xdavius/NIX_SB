@@ -465,3 +465,58 @@ rétention réussis ; actionlint, shellcheck et git diff --check réussis.
 La publication simulée vérifie l’upload des deux variantes avant promotion et
 l’absence d’appel API si une archive manque. Aucun appel de publication réel
 ni usage d’une clé de production pendant cette refonte.
+
+## 2026-11-08 — NVIDIA 620 sur le vrai latest
+
+Branche de travail : feat/nvidia-620. NVIDIA passe de 615.71.09 à
+620.70.06 dans pkgs/drivers/nvidia/version.json. Les cinq hashes ont été
+recalculés depuis les archives NVIDIA et les tags GitHub officiels.
+Les définitions mkDriver et le choix des familles de noyaux restent identiques.
+
+Compilation réelle des cinq modules nvidia-open réussie sans patch additionnel
+sur Linux 7.3 (testing nixpkgs 31ecbaca), via :
+`nix build --no-update-lock-file --no-link --print-build-logs
+path:$PWD#legacyPackages.x86_64-linux.testing.upstream-latest.drivers.nvidia-open`.
+modinfo confirme NVIDIA 620.70.06, vermagic 7.3.0 et une signature PKCS#7.
+Des avertissements objtool sont présents, sans empêcher la réussite du build.
+Log local : /tmp/nvidia-620-linux-latest-build.log.
+
+Compilation réelle des modules également réussie sur la variante publiée
+testing-latest, Linux 7.2.13, via `nix build --no-update-lock-file --no-link
+--print-build-logs --max-jobs 1 --cores 2 path:$PWD#testing-latest-nvidia-open`.
+Log local : /tmp/nvidia-620-linux-7.2-build.log.
+
+Les assertions testing-packages et testing-latest-packages s’évaluent avec succès.
+Cette validation porte sur les modules, pas sur le paquet utilisateur complet,
+une image noyau enrichie ou le fonctionnement sur un vrai GPU. Aucune signature
+de production ni publication effectuée. Le passage des modules sur 7.3 ne valide
+pas encore les autres pilotes du catalogue pour changer le noyau publié.
+
+### Audit des fichiers utilisateurs NVIDIA 620
+
+À la demande de l’utilisateur, construction ciblée des sorties out/bin/lib32/
+firmware de testing-upstream-latest-nvidia, puis nvidia.settings et
+nvidia.persistenced : réussite. Aucun noyau ni module recompilé.
+Log : /tmp/nvidia-620-userspace-build.log.
+
+Comparaison des bibliothèques livrées par l’archive officielle aux sorties Nix,
+en tenant compte des exclusions explicites du builder nixpkgs ; vérification
+des ICD Vulkan/OpenCL/EGL, du lien GBM, des DLL DLSS, des profils, des outils,
+des firmwares GSP et des scripts de veille : 93 contrôles réussis. Aucun fichier
+attendu manquant, aucun lien symbolique cassé ni cible de loader JSON absente.
+Script local : /tmp/audit-nvidia-620-files.py ; résultat :
+/tmp/nvidia-620-files-audit.json.
+
+Évaluation NixOS représentative avec videoDrivers = [ "nvidia" ], package =
+sb.nvidia, open = true, graphics.enable32Bit = true et nvidiaPersistenced = true :
+aucune assertion échouée. Les modules 620, bibliothèques 64/32 bits, firmware,
+settings et persistenced sont raccordés. EGL Wayland/Wayland2/GBM/X11 vient des
+paquets externes nixpkgs, conformément au module NixOS. Cette évaluation ne
+remplace pas un audit de la configuration GLF-OS réelle ni un test matériel.
+
+Le packaging n’est pas une copie exhaustive de l’archive NVIDIA : absence
+confirmée de nvidia_icd_vksc.json, nvidia-pcc, sandboxutils-filelist.json et
+nvidia-ngx-updater. Le contrôle de fichiers attendus suit le builder nixpkgs,
+il ne prouve donc pas que tous les fichiers amont sont couverts. Aucune adaptation
+de packaging effectuée pendant cet audit. CUDA toolkit et intégration conteneurs
+ne sont pas validés par ces contrôles.
