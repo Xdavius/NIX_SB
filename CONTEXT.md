@@ -520,3 +520,68 @@ nvidia-ngx-updater. Le contrôle de fichiers attendus suit le builder nixpkgs,
 il ne prouve donc pas que tous les fichiers amont sont couverts. Aucune adaptation
 de packaging effectuée pendant cet audit. CUDA toolkit et intégration conteneurs
 ne sont pas validés par ces contrôles.
+
+### Complément du packaging utilisateurs NVIDIA 620
+
+Reprise de l’audit sur feat/nvidia-620 à la demande de l’utilisateur.
+La documentation NVIDIA confirme que les absences concernent des composants
+annexes : Vulkan SC/PCC, updater NGX optionnel et inventaire pour les conteneurs.
+L’absence seule ne démontrait donc pas un défaut de la pile graphique classique.
+
+package.nix ajoute un hook local install-extras.sh au mkDriver nixpkgs :
+installation de nvidia-pcc et nvidia-ngx-updater avec interpréteur/RPATH Nix,
+copies originales dans origBin, ICD Vulkan SC avec cible absolue dans out,
+inventaire sandboxutils dans bin/share/nvidia/files.d et updater Wine
+nvngx_update.exe dans out/lib/nvidia/wine. NGX n’est pas activé automatiquement.
+Le schéma et les noms relatifs de l’inventaire fournisseur sont conservés.
+
+check-install.py est exécuté automatiquement en installCheckPhase. Il vérifie
+les fichiers, le format PE de l’updater Wine, la cible de l’ICD, les dépendances
+des exécutables via le chargeur ELF (sans exécuter les applications) et les
+liens symboliques des sorties out/bin. Build utilisateur et nvidia-settings
+réussis ; nvidia-pcc --help fonctionne et annonce 620.70.06.
+Comparaison aux sorties précédentes : aucun fichier perdu dans out/bin/lib32/
+firmware ; cibles absolues des ICD toujours présentes. Les chemins du module
+Linux 7.3 et de persistenced sont identiques à ceux précédemment validés.
+Aucun noyau ni module recompilé ; nvidia-settings est reconstruit car son
+chemin vers les profils utilise la nouvelle sortie bin.
+
+Assertions de paquets testing/default et testing/latest évaluées avec succès.
+Une configuration NixOS représentative confirme le raccordement out/bin/lib32,
+modules, firmware et settings, sans assertion échouée. Aucun système installé,
+aucune publication ni signature de production.
+
+Limites explicites dans docs/drivers.md : le dépôt fournit les fichiers mais
+la découverte de l’inventaire par sandboxutils et les montages CDI restent à
+valider avec le module NVIDIA Container Toolkit ; le binaire fournisseur contient
+des chemins /usr. Vulkan SC et NGX nécessitent leurs propres tests fonctionnels.
+La pile GPU réelle et l’architecture ARM n’ont pas été testées ici.
+Logs locaux : /tmp/nvidia-620-extras-build.log et
+/tmp/nvidia-620-integration.json. Modifications non committées pendant cette reprise.
+
+### Complément idempotent et détection du support amont
+
+À la demande de l’utilisateur, le hook ne complète désormais que les chemins
+absents. Les fichiers et liens déjà installés par nixpkgs sont conservés, y
+compris un lien cassé qui doit faire échouer la validation plutôt qu’être masqué.
+package.nix compose le postInstall existant et ajoute le contrôle local dans
+postInstallCheck : les phases et hooks amont ne sont plus remplacés.
+
+Chaque build produit out/nix-support/nvidia-extras.json (schéma 1, version du
+pilote, addedByNixSb, providedByNixpkgs, upstreamComplete) et le journalise.
+Lors d’une seconde exécution, les ajouts locaux conservent leur provenance pour
+éviter un faux diagnostic de support natif. Un build réussi avec upstreamComplete
+à true signale que le complément peut être retiré ; ce signal porte sur les
+fichiers contrôlés, pas sur le numéro de version déclaré par nixpkgs ni sur la
+validation GPU/conteneurs. Le choix local de version reste une question distincte.
+
+Sept tests légers réussis (tests/test_nvidia_extras.py), intégrés à ci/check.sh :
+installation absente/partielle/complète, réexécution, conservation des liens,
+rejet d’un lien cassé par le validateur, source requise absente et composition des
+hooks/phases/entrées de contrôle amont, y compris postInstall nul.
+Build utilisateur réel et nvidia-settings réussis avec le nouveau hook ; aucun
+noyau/module recompilé. Les sept ajouts restent requis avec le nixpkgs testing
+actuel : upstreamComplete vaut false. Vérifications ELF, ICD, liens et rapport
+réussies en postInstallCheck ; contrats testing/default et testing/latest évalués.
+Log local : /tmp/nvidia-620-idempotent-build.log.
+Ces modifications restent locales, sans commit ni push pendant cette reprise.

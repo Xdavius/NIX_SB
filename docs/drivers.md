@@ -69,6 +69,59 @@ uniquement pour les paquets dont le nom commence par nvidia. Un consommateur
 via callPackage doit configurer son nixpkgs en conséquence. L’évaluation ne
 valide pas le téléchargement des sources, la compilation ni le matériel.
 
+### Compléments utilisateurs NVIDIA 620
+
+`pkgs/drivers/nvidia/install-extras.sh` complète le builder nixpkgs depuis
+la même archive que les bibliothèques, sans changer les modules noyau :
+
+- Vulkan SC : ICD dans `out/share/vulkansc/icd.d/nvidia_icd.json`, avec chemin
+  absolu vers la bibliothèque ; compilateur `nvidia-pcc` dans `bin/bin`.
+- NGX : `nvidia-ngx-updater` dans `bin/bin` et `nvngx_update.exe` dans
+  `out/lib/nvidia/wine`. Les exécutables Linux ont un interpréteur et un RPATH Nix.
+- Inventaire amont : `bin/share/nvidia/files.d/sandboxutils-filelist.json`,
+  conservé avec son schéma original. Ce fichier n’est pas un inventaire des
+  chemins absolus du store Nix.
+
+Le contrôle d’installation intégré vérifie ces fichiers, les dépendances ELF
+des nouveaux outils, la cible de l’ICD Vulkan SC et les liens symboliques.
+Le complément ne remplace aucun fichier ou lien déjà installé par nixpkgs.
+Un fichier amont invalide fait échouer le contrôle ; il n’est pas écrasé pour
+masquer le problème. Les hooks et contrôles préexistants de nixpkgs sont conservés.
+
+Chaque build écrit `out/nix-support/nvidia-extras.json` et affiche son contenu
+dans les logs : `addedByNixSb` liste les ajouts locaux, `providedByNixpkgs` les
+éléments déjà fournis et `upstreamComplete` indique si aucun ajout n’était requis.
+Après un build réussi avec `upstreamComplete: true`, le complément local devient
+candidat au retrait. Ce diagnostic concerne les fichiers contrôlés, indépendamment
+du numéro du pilote proposé par défaut dans nixpkgs ; il ne remplace pas les
+tests GPU et conteneurs. Il ne signifie pas qu’il faut retirer le choix de version
+dans `version.json`.
+
+Pour consulter le rapport du paquet construit :
+
+```sh
+nix build --no-update-lock-file "path:$PWD#testing-upstream-latest-nvidia" --out-link result-nvidia
+cat result-nvidia/nix-support/nvidia-extras.json
+```
+
+Le test léger `python3 -m unittest discover -s tests -p test_nvidia_extras.py`
+couvre notamment la prise en charge amont partielle/complète et deux exécutions
+successives. La provenance est conservée lors de la seconde exécution pour éviter
+de prendre nos propres ajouts pour un support natif de nixpkgs.
+
+Le contrôle d’installation ne lance ni mise à jour NGX ni application GPU.
+NGX reste désactivé par défaut ;
+son activation utilise la configuration documentée par NVIDIA, notamment
+`__NGX_CONF_FILE` ou `$XDG_CONFIG_HOME/nvidia-ngx-conf.json` et un répertoire de
+modèles accessible en écriture. Voir [la documentation NGX de NVIDIA](https://download.nvidia.com/XFree86/Linux-x86_64/620.70.06/README/ngx.html).
+
+Le module NixOS expose déjà `sb.nvidia.bin` dans les paquets système et
+`sb.nvidia.out` dans les paquets graphiques. L’ajout des fichiers ne valide
+pas leur utilisation dans des conteneurs : la découverte de l’inventaire et les
+montages CDI restent à tester sur un poste avec le module NVIDIA Container Toolkit.
+Vulkan SC requiert aussi un test avec un chargeur/application Vulkan SC ; il est
+distinct du Vulkan utilisé par les jeux. Voir [les composants installés par NVIDIA](https://download.nvidia.com/XFree86/Linux-x86_64/620.70.06/README/installedcomponents.html).
+
 Ce catalogue approuve dix drivers ; il n’impose pas de tous les activer.
 La fixture de test les agrège tous pour vérifier la cohérence des certificats.
 

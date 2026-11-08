@@ -14,6 +14,7 @@ nix eval "$flake_ref#checks.x86_64-linux.${prefix}packages.drvPath" --no-update-
 nix eval "$flake_ref#checks.x86_64-linux.${prefix}multiboot-module.drvPath" --no-update-lock-file
 python3 -m unittest discover -s tests -p 'test_kernel_variant.py'
 python3 -m unittest discover -s tests -p 'test_catalogue.py'
+python3 -m unittest discover -s tests -p 'test_nvidia_extras.py'
 python3 -m unittest discover -s tests -p 'test_signed_consumer.py'
 python3 -m unittest discover -s tests -p 'test_release_tag.py'
 python3 -m unittest discover -s tests -p 'test_release_bundle.py'
