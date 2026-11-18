@@ -26,6 +26,8 @@ nix path-info --recursive --json --json-format 1 "$kernel" "$certs" "$sdboot" "$
 printf '%s\n' "$kernel" "$certs" "$sdboot" "$shim" "$refind" > dist/unsigned/store-paths.txt
 export GLF_RELEASE_BRANCH="${GITHUB_REF_NAME:-$(git branch --show-current)}"
 export GLF_RELEASE_COMMIT="${GITHUB_SHA:-$(git rev-parse HEAD)}"
+export GLF_RELEASE_NVIDIA
+GLF_RELEASE_NVIDIA=$(nix eval --no-update-lock-file --raw "$flake_ref#${prefix}nvidia.version")
 python3 - <<'PYMETA'
 import json
 import os
@@ -38,7 +40,7 @@ metadata = {
     "commit": os.environ["GLF_RELEASE_COMMIT"],
     "kernelVariant": os.environ.get("GLF_KERNEL_VARIANT", "default"),
     "kernel": json.loads(Path("pkgs/kernel/kernel.json").read_text())[os.environ.get("GLF_KERNEL_VARIANT", "default")],
-    "nvidia": json.loads(Path("pkgs/drivers/nvidia/version.json").read_text())["version"],
+    "nvidia": os.environ["GLF_RELEASE_NVIDIA"],
     "nixpkgs": channels["nixpkgs"]["rev"],
     "channels": channels,
 }

@@ -9,13 +9,14 @@ Ce dépôt centralise le choix du noyau nixpkgs, les définitions des drivers GL
 le catalogue de confiance et les outils de signature Secure Boot.
 
 - Deux variantes testing sont construites et publiées : `default` (famille de
-  `pkgs/kernel/kernel.json`) et `latest` (famille `linuxPackages_7_2` du même channel).
+  `pkgs/kernel/kernel.json`) et `latest` (famille `linuxPackages_7_3` du même channel).
   Une seule release GitHub « Latest » contient les deux archives et leurs descripteurs.
 - `pkgs/kernel/kernel.json` : familles nixpkgs des variantes publiées `default` et `latest`,
   plus `upstream-latest` réservé aux tests de régression.
 - `flake.lock` : fichier local/CI temporaire, ignore par Git ; les versions viennent des channels GLF-OS.
 - `pkgs/drivers/catalogue.json` : dix drivers approuvés, dont xonedo, xpad-noone et openrazer.
-- `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes, gérés ici.
+- `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes de `default` et `latest`, gérés ici.
+  `upstream-latest` utilise `nvidiaPackages.latest` du channel résolu.
 - `pkgs/drivers/hid-fanatecff` et `new-lg4ff` : vos définitions désormais maintenues ici.
 - `pkgs/kernel` : sélection du noyau et production de son image enrichie des certificats.
 - `modules/multiboot.nix` : intégration NixOS, menu rEFInd GLF et générations en sous-menu ([guide](docs/MULTIBOOT.md)).
@@ -62,5 +63,5 @@ Documentation : [drivers](docs/drivers.md), [architecture](docs/architecture.md)
 Le workflow indépendant `kernel-regressions.yml` construit quotidiennement le vrai
 `linuxPackages_latest`, son image enrichie et tous les drivers du catalogue.
 Un échec reste visible dans Actions avec les logs, sans bloquer les releases
-6.18/7.2. Il ne signe et ne publie aucun composant. Le gel sur 7.2 concerne
+6.18/7.3. Il ne signe et ne publie aucun composant. Le gel sur 7.3 concerne
 la famille du noyau ; ses versions correctives continuent de suivre le channel.
