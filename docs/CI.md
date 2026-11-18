@@ -105,7 +105,9 @@ La variante publiée `latest` reste sur `linuxPackages_7_3`, à côté de
 Ces sorties dépendent de tous les drivers du catalogue. `--keep-going` permet
 de continuer les constructions indépendantes après un premier échec, et
 `--print-build-logs` conserve les erreurs de compilation dans l'artefact
-avec la version noyau, les pins channels et le lock résolu.
+avec les versions noyau et NVIDIA (`kernel-version.txt` et `nvidia-version.txt`),
+les pins channels et le lock résolu. Les deux versions sont affichées dans le
+résumé Actions avant la compilation et restent consultables si elle échoue.
 
 Exécution quotidienne à 05:53 UTC, manuelle, ou sur push main/PR touchant
 les définitions concernées. Aucun secret de signature, aucune release.
