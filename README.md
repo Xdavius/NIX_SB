@@ -41,6 +41,29 @@ amont à version/hash fixes. Il n’y a plus de sous-flake ni de synchronisation
 les anciens dépôts de packaging. Une modification noyau/driver se fait ici.
 Aucun fichier GLF-OS ni ancien dépôt de driver n’est modifié automatiquement.
 
+## Choisir la variante dans GLF-OS
+
+Dans `/etc/nixos/customConfig/default.nix`, ajouter cette option à l’intérieur
+du bloc de configuration existant :
+
+```nix
+glf.boot.kernelVariant = "latest";
+```
+
+Appliquer avec `glf-update`, puis redémarrer. Pour revenir à `default`, remplacer
+`"latest"` par `"default"` ou retirer cette option : `default` est le choix par défaut.
+
+| Option | Famille du noyau | Version NVIDIA définie dans NIX_SB |
+| --- | --- | --- |
+| `"default"` | Linux 6.18 | 615.71.09 |
+| `"latest"` | Linux 7.3 | 615.78.08 |
+
+Le choix sélectionne ensemble le noyau signé et ses pilotes de la même publication.
+Les familles et versions sont définies dans `pkgs/kernel/kernel.json` et
+`pkgs/drivers/nvidia/version.json` ; elles pourront évoluer lors des mises à jour.
+L’option ne change pas le channel GLF-OS. `upstream-latest` sert uniquement aux
+tests de régression et n’est pas une valeur proposée dans `customConfig`.
+
 ## Vérifications légères
 
 ```sh
