@@ -61,8 +61,8 @@ Chaque variante publiée possède son entrée dans `pkgs/drivers/nvidia/version.
 `default` conserve NVIDIA 615.71.09 et `latest` utilise NVIDIA 615.78.08.
 Les versions et leurs cinq hashes sont choisis manuellement pour chaque entrée
 et appliqués via `nvidiaPackages.mkDriver`.
-La variante `upstream-latest` utilise directement
-`kernelPackages.nvidiaPackages.latest` du même channel que le noyau.
+L’entrée `"upstream-latest": { "package": "latest" }` du même JSON référence
+`kernelPackages.nvidiaPackages.latest` du même channel que le noyau, sans hashes locaux.
 Elle suit les mises à jour de ce channel lors de la résolution du lock.
 `sb.nvidia` fournit le paquet complet pour `hardware.nvidia.package` ;
 `sb.drivers.nvidia-open` est exactement `sb.nvidia.open`, inclus dans la confiance.

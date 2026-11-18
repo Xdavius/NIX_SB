@@ -14,5 +14,8 @@
     "openSha256": "sha256-HBINiOjL0ZJLIAJeNIBYHBnwgUXtNwPPtnFpAI1YwF4=",
     "settingsSha256": "sha256-inDRpG02sdDgHmlqgu/DsgK8OFdOt1fZIYyXdhlGC/c=",
     "persistencedSha256": "sha256-RzeR6Ldct6MUxjnXRyThdh5Y3jjMehTVg85MtwuWNX4="
+  },
+  "upstream-latest": {
+    "package": "latest"
   }
 }

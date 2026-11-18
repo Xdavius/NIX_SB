@@ -1,8 +1,11 @@
-# Les variantes publiees gardent le pin local ; upstream-latest suit le channel.
+# Chaque variante definit un pin ou un attribut de nvidiaPackages dans le JSON.
 { nvidiaPackages, kernelVariant ? "default" }:
-if builtins.elem kernelVariant [ "default" "latest" ] then
-  nvidiaPackages.mkDriver ((builtins.fromJSON (builtins.readFile ./version.json)).${kernelVariant})
-else if kernelVariant == "upstream-latest" then
-  nvidiaPackages.latest
+let
+  variants = builtins.fromJSON (builtins.readFile ./version.json);
+  selected = if builtins.hasAttr kernelVariant variants then variants.${kernelVariant}
+    else throw "NVIDIA: variante noyau inconnue: ${kernelVariant}";
+in
+if selected ? package then
+  nvidiaPackages.${selected.package}
 else
-  throw "NVIDIA: variante noyau inconnue: ${kernelVariant}"
+  nvidiaPackages.mkDriver selected
