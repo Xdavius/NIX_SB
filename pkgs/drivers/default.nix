@@ -1,5 +1,6 @@
-{ lib, kernelPackages, catalogueFile ? ./catalogue.json }:
+{ lib, kernelPackages, catalogueFile ? ./catalogue.json, kernelVariant ? "default" }:
 let
+  callDriver = (kernelPackages.extend (_: _: { inherit kernelVariant; })).callPackage;
   catalogue = builtins.fromJSON (builtins.readFile catalogueFile);
   base = builtins.dirOf catalogueFile;
   fail = name: message: throw "Catalogue drivers (${name}): ${message}";
@@ -20,7 +21,7 @@ let
             fail name "path doit etre relatif au catalogue, sans '..'"
           else
             let source = base + "/${entry.path}";
-            in if builtins.pathExists source then kernelPackages.callPackage source { }
+            in if builtins.pathExists source then callDriver source { }
             else fail name "definition introuvable: ${entry.path}"
         else fail name "attendu exactement 'package' ou 'path' de type chaine";
     in

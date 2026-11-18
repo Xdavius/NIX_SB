@@ -37,16 +37,18 @@ jobs:
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012
-      - name: Resoudre les channels et identifier le noyau amont
+      - name: Resoudre les channels et identifier le noyau et NVIDIA amont
         run: |
           mkdir -p dist/regressions
           nix flake lock "path:$PWD" --refresh
           cp flake.lock dist/regressions/flake.lock
           python3 ci/channels.py --profile testing > dist/regressions/channels.json
           nix eval --no-update-lock-file --raw "path:$PWD#legacyPackages.x86_64-linux.testing.upstream-latest.kernelPackages.kernel.version" > dist/regressions/kernel-version.txt
+          nix eval --no-update-lock-file --raw "path:$PWD#legacyPackages.x86_64-linux.testing.upstream-latest.nvidia.version" > dist/regressions/nvidia-version.txt
           {
             echo '### Regression du vrai linuxPackages_latest'
-            echo "Version : $(cat dist/regressions/kernel-version.txt)"
+            echo "Noyau : $(cat dist/regressions/kernel-version.txt)"
+            echo "NVIDIA : $(cat dist/regressions/nvidia-version.txt)"
             echo 'Construction du noyau et de tous les drivers approuves ; aucune signature ni publication.'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Compiler le noyau et le catalogue complet

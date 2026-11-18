@@ -3,7 +3,7 @@ let
   inherit (pkgs) callPackage;
   kernelPackages = import ./pkgs/kernel/select.nix { inherit pkgs kernelVariant; };
   drivers = builtins.removeAttrs (callPackage ./pkgs/drivers {
-    inherit kernelPackages catalogueFile;
+    inherit kernelPackages catalogueFile kernelVariant;
   }) [ "override" "overrideDerivation" ];
   modulesTree = callPackage ./pkgs/modules-tree {
     inherit kernelPackages;
@@ -12,7 +12,7 @@ let
   shared = { inherit kernelPackages modulesTree; approvedModules = drivers; };
 in rec {
   inherit kernelPackages drivers modulesTree;
-  nvidia = kernelPackages.callPackage ./pkgs/drivers/nvidia/package.nix {};
+  nvidia = kernelPackages.callPackage ./pkgs/drivers/nvidia/package.nix { inherit kernelVariant; };
   kernel = callPackage ./pkgs/kernel shared;
   certificates = callPackage ./pkgs/certificates shared;
   refind = callPackage ./pkgs/refind {};

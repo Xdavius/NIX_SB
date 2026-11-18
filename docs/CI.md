@@ -96,7 +96,7 @@ nouveautes des channels.
 
 ## Suivi du vrai dernier noyau
 
-La variante publiée `latest` reste sur `linuxPackages_7_2`, à côté de
+La variante publiée `latest` reste sur `linuxPackages_7_3`, à côté de
 `default` (`linuxPackages_6_18`). `pkgs/kernel/kernel.json` déclare aussi
 `upstream-latest = linuxPackages_latest` pour les tests uniquement.
 
@@ -105,7 +105,9 @@ La variante publiée `latest` reste sur `linuxPackages_7_2`, à côté de
 Ces sorties dépendent de tous les drivers du catalogue. `--keep-going` permet
 de continuer les constructions indépendantes après un premier échec, et
 `--print-build-logs` conserve les erreurs de compilation dans l'artefact
-avec la version noyau, les pins channels et le lock résolu.
+avec les versions noyau et NVIDIA (`kernel-version.txt` et `nvidia-version.txt`),
+les pins channels et le lock résolu. Les deux versions sont affichées dans le
+résumé Actions avant la compilation et restent consultables si elle échoue.
 
 Exécution quotidienne à 05:53 UTC, manuelle, ou sur push main/PR touchant
 les définitions concernées. Aucun secret de signature, aucune release.
@@ -132,3 +134,15 @@ publique existante n'est réutilisée que si les six fichiers sont présents ; u
 release incomplète provoque une erreur explicite. Le préfixe `bundle` distingue
 ce format des publications historiques par variante, toujours reconnues par
 la rétention globale de sept releases. Le suivi upstream reste indépendant.
+
+## Sélection NVIDIA par variante
+
+`default` et `latest` utilisent chacun leur entrée de `pkgs/drivers/nvidia/version.json`
+(version et hashes choisis manuellement) ;
+`upstream-latest` utilise `kernelPackages.nvidiaPackages.latest` du channel
+résolu. Le lock commun fixe aussi cette version NVIDIA : aucun téléchargement
+d'un nouveau Nixpkgs n'est nécessaire entre validation, build et signature.
+Les contrôles de chaque variante vérifient le choix du pilote et l'identité
+entre `sb.nvidia.open` et les modules NVIDIA du catalogue approuvé.
+`ci/build.sh` évalue la version de la sortie `nvidia` de la variante construite
+pour renseigner le champ `nvidia` du manifeste, conservé après signature.

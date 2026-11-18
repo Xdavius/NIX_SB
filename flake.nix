@@ -54,7 +54,7 @@
       } // sb.drivers;
       nixosConfigurations.prototype = target;
       checks.${system} = {
-        packages = import ./tests/packages.nix { inherit pkgs sb target; };
+        packages = import ./tests/packages.nix { inherit pkgs sb target kernelVariant; };
         multiboot-module = import ./tests/multiboot-module.nix { inherit pkgs sb; };
       };
       devShells.${system} = {

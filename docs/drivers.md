@@ -49,7 +49,7 @@ Catalogue approuvé, issu du relevé GLF-OS `develop` et des ajouts demandés :
 | openrazer | nixpkgs | périphériques Razer |
 | xonedo | locale | variante xone pour dongle Xbox Wireless |
 | v4l2loopback | nixpkgs avec DEPMOD=true | caméra virtuelle OBS |
-| nvidia-open | mkDriver nixpkgs, version locale | GPU NVIDIA, open=true |
+| nvidia-open | pin local pour default/latest, nixpkgs latest pour upstream-latest | GPU NVIDIA, open=true |
 
 Les pilotes natifs (amdgpu, i915, ntsync, etc.) sont déjà dans l’arbre du noyau.
 ZFS n’est pas activé dans le checkout GLF-OS relevé.
@@ -57,11 +57,16 @@ Les firmwares, pilotes d’impression et outils utilisateurs ne sont pas des
 modules externes à ajouter au bundle de certificats. Leur activation reste côté
 système (par exemple le firmware du dongle Xbox fourni par hardware.xone).
 
-La version NVIDIA est désormais définie dans `pkgs/drivers/nvidia/version.json`,
-avec tous ses hashes. Version initiale : 615.71.09, reprise de GLF-OS.
+Chaque variante publiée possède son entrée dans `pkgs/drivers/nvidia/version.json` :
+`default` conserve NVIDIA 615.71.09 et `latest` utilise NVIDIA 615.78.08.
+Les versions et leurs cinq hashes sont choisis manuellement pour chaque entrée
+et appliqués via `nvidiaPackages.mkDriver`.
+L’entrée `"upstream-latest": { "package": "latest" }` du même JSON référence
+`kernelPackages.nvidiaPackages.latest` du même channel que le noyau, sans hashes locaux.
+Elle suit les mises à jour de ce channel lors de la résolution du lock.
 `sb.nvidia` fournit le paquet complet pour `hardware.nvidia.package` ;
 `sb.drivers.nvidia-open` est exactement `sb.nvidia.open`, inclus dans la confiance.
-Modifier la version une seule fois dans ce JSON. Aucun paquet propriétaire de
+Modifier uniquement l’entrée de la variante souhaitée dans ce JSON. Aucun paquet propriétaire de
 modules NVIDIA n’est approuvé par ce catalogue : le mode choisi est open=true.
 
 Le paquet complet inclut des composants non libres. La flake les autorise

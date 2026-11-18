@@ -3,7 +3,7 @@
 ## Choisir le noyau dans NIX_SB
 
 `pkgs/kernel/kernel.json` contient les variantes `default` (`linuxPackages_6_18`)
-et `latest` (`linuxPackages_7_2`) publiées, ainsi que `upstream-latest`
+et `latest` (`linuxPackages_7_3`) publiées, ainsi que `upstream-latest`
 (`linuxPackages_latest`) réservé à la détection des régressions. Changer la valeur d’une variante
 pour choisir une autre famille disponible dans le nixpkgs du dépôt. Le patchlevel
 exact dépend du nixpkgs fourni par les channels GLF-OS. La CI NIX_SB doit
@@ -49,7 +49,9 @@ paquets de drivers. Les sorties uki et enrollment restent des artefacts de test.
 ## NVIDIA
 
 NIX_SB expose `sb.nvidia` (paquet complet) et `sb.drivers.nvidia-open` (modules).
-La version et ses hashes sont choisis dans pkgs/drivers/nvidia/version.json.
+Pour `default` et `latest`, la version et ses hashes sont choisis séparément dans
+les entrées `default` et `latest` de `pkgs/drivers/nvidia/version.json`. Pour `upstream-latest`,
+le pilote suit `kernelPackages.nvidiaPackages.latest` du channel résolu.
 Le consommateur utilise `hardware.nvidia.package = sb.nvidia;` et
 `hardware.nvidia.open = true;` lorsque NVIDIA est activé. Il conserve la gestion
 matérielle de PRIME, des services et de l’énergie. Cet exemple ne modifie pas GLF-OS.
