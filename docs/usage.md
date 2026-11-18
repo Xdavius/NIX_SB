@@ -49,8 +49,8 @@ paquets de drivers. Les sorties uki et enrollment restent des artefacts de test.
 ## NVIDIA
 
 NIX_SB expose `sb.nvidia` (paquet complet) et `sb.drivers.nvidia-open` (modules).
-Pour `default` et `latest`, la version et ses hashes sont choisis dans
-`pkgs/drivers/nvidia/version.json`. Pour `upstream-latest`,
+Pour `default` et `latest`, la version et ses hashes sont choisis séparément dans
+les entrées `default` et `latest` de `pkgs/drivers/nvidia/version.json`. Pour `upstream-latest`,
 le pilote suit `kernelPackages.nvidiaPackages.latest` du channel résolu.
 Le consommateur utilise `hardware.nvidia.package = sb.nvidia;` et
 `hardware.nvidia.open = true;` lorsque NVIDIA est activé. Il conserve la gestion

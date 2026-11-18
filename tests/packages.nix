@@ -34,7 +34,7 @@ assert builtins.attrNames sb.drivers == [
 assert sb.drivers.nvidia-open.outPath == sb.nvidia.open.outPath;
 assert sb.drivers.nvidia-open.version == "${sb.nvidia.version}-${kernelPackages.kernel.version}";
 assert (if builtins.elem kernelVariant [ "default" "latest" ] then
-  sb.nvidia.version == (builtins.fromJSON (builtins.readFile ../pkgs/drivers/nvidia/version.json)).version
+  sb.nvidia.version == (builtins.fromJSON (builtins.readFile ../pkgs/drivers/nvidia/version.json)).${kernelVariant}.version
 else sb.nvidia.outPath == kernelPackages.nvidiaPackages.latest.outPath);
 assert builtins.elem "INSTALL_MOD_DIR=extra/xonedo" sb.drivers.xonedo.installFlags;
 assert sb.drivers.xonedo.installTargets == [ "modules_install" ];

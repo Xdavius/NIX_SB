@@ -57,14 +57,16 @@ Les firmwares, pilotes d’impression et outils utilisateurs ne sont pas des
 modules externes à ajouter au bundle de certificats. Leur activation reste côté
 système (par exemple le firmware du dongle Xbox fourni par hardware.xone).
 
-Pour les variantes `default` et `latest`, la version NVIDIA et ses hashes sont définis
-dans `pkgs/drivers/nvidia/version.json` et appliqués via `nvidiaPackages.mkDriver`.
+Chaque variante publiée possède son entrée dans `pkgs/drivers/nvidia/version.json` :
+`default` conserve NVIDIA 615.71.09 et `latest` utilise NVIDIA 615.78.08.
+Les versions et leurs cinq hashes sont choisis manuellement pour chaque entrée
+et appliqués via `nvidiaPackages.mkDriver`.
 La variante `upstream-latest` utilise directement
 `kernelPackages.nvidiaPackages.latest` du même channel que le noyau.
 Elle suit les mises à jour de ce channel lors de la résolution du lock.
 `sb.nvidia` fournit le paquet complet pour `hardware.nvidia.package` ;
 `sb.drivers.nvidia-open` est exactement `sb.nvidia.open`, inclus dans la confiance.
-Modifier la version de `default` et `latest` une seule fois dans ce JSON. Aucun paquet propriétaire de
+Modifier uniquement l’entrée de la variante souhaitée dans ce JSON. Aucun paquet propriétaire de
 modules NVIDIA n’est approuvé par ce catalogue : le mode choisi est open=true.
 
 Le paquet complet inclut des composants non libres. La flake les autorise

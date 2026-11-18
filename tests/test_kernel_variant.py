@@ -64,7 +64,7 @@ class NvidiaVariantTests(unittest.TestCase):
     def check_pin(self, variant):
         result = self.evaluate(variant)
         self.assertEqual(result.returncode, 0, result.stderr)
-        pin = json.loads((SELECT.parents[1] / 'drivers/nvidia/version.json').read_text())
+        pin = json.loads((SELECT.parents[1] / 'drivers/nvidia/version.json').read_text())[variant]
         self.assertEqual(json.loads(result.stdout), {
             'version': pin['version'],
             'modules': {'version': pin['version'], 'origin': 'pin'},

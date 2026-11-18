@@ -1,7 +1,7 @@
 # Les variantes publiees gardent le pin local ; upstream-latest suit le channel.
 { nvidiaPackages, kernelVariant ? "default" }:
 if builtins.elem kernelVariant [ "default" "latest" ] then
-  nvidiaPackages.mkDriver (builtins.fromJSON (builtins.readFile ./version.json))
+  nvidiaPackages.mkDriver ((builtins.fromJSON (builtins.readFile ./version.json)).${kernelVariant})
 else if kernelVariant == "upstream-latest" then
   nvidiaPackages.latest
 else

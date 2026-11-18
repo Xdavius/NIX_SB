@@ -137,7 +137,8 @@ la rétention globale de sept releases. Le suivi upstream reste indépendant.
 
 ## Sélection NVIDIA par variante
 
-`default` et `latest` utilisent le pin de `pkgs/drivers/nvidia/version.json` ;
+`default` et `latest` utilisent chacun leur entrée de `pkgs/drivers/nvidia/version.json`
+(version et hashes choisis manuellement) ;
 `upstream-latest` utilise `kernelPackages.nvidiaPackages.latest` du channel
 résolu. Le lock commun fixe aussi cette version NVIDIA : aucun téléchargement
 d'un nouveau Nixpkgs n'est nécessaire entre validation, build et signature.

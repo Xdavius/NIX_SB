@@ -15,7 +15,7 @@ le catalogue de confiance et les outils de signature Secure Boot.
   plus `upstream-latest` réservé aux tests de régression.
 - `flake.lock` : fichier local/CI temporaire, ignore par Git ; les versions viennent des channels GLF-OS.
 - `pkgs/drivers/catalogue.json` : dix drivers approuvés, dont xonedo, xpad-noone et openrazer.
-- `pkgs/drivers/nvidia/version.json` : version NVIDIA et hashes de `default` et `latest`, gérés ici.
+- `pkgs/drivers/nvidia/version.json` : versions NVIDIA et hashes distincts pour `default` et `latest`, choisis manuellement.
   `upstream-latest` utilise `nvidiaPackages.latest` du channel résolu.
 - `pkgs/drivers/hid-fanatecff` et `new-lg4ff` : vos définitions désormais maintenues ici.
 - `pkgs/kernel` : sélection du noyau et production de son image enrichie des certificats.
