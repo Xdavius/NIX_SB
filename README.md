@@ -53,10 +53,10 @@ glf.boot.kernelVariant = "latest";
 Appliquer avec `glf-update`, puis redémarrer. Pour revenir à `default`, remplacer
 `"latest"` par `"default"` ou retirer cette option : `default` est le choix par défaut.
 
-| Option | Famille du noyau | Version NVIDIA définie dans NIX_SB |
-| --- | --- | --- |
-| `"default"` | Linux 6.18 | 615.71.09 |
-| `"latest"` | Linux 7.3 | 615.78.08 |
+| Option      | Famille du noyau | Version NVIDIA définie dans NIX_SB |
+| ----------- | ---------------- | ---------------------------------- |
+| `"default"` | Linux 6.18       | 615.71.09                          |
+| `"latest"`  | Linux 7.3        | 615.78.08                          |
 
 Le choix sélectionne ensemble le noyau signé et ses pilotes de la même publication.
 Les familles et versions sont définies dans `pkgs/kernel/kernel.json` et
